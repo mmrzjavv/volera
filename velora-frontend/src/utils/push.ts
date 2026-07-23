@@ -122,7 +122,8 @@ export const subscribeToPushNotifications = async (): Promise<boolean> => {
  * so 1:1 notifications work even if they never opened Chat first.
  */
 export const ensurePushSubscription = async (): Promise<void> => {
-    if (!('Notification' in window)) return;
+    // typeof avoids ReferenceError on iOS Safari where Notification is missing
+    if (typeof Notification === 'undefined') return;
     const permission = Notification.permission;
     if (permission === 'denied') return;
     if (permission === 'granted') {
