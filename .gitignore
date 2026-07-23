@@ -1,0 +1,65 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+!**/.env.example
+!**/*.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+credentials.json
+secrets.json
+**/appsettings.*.local.json
+**/appsettings.DockerLocal.json
+**/appsettings.Secrets.json
+
+# Database dumps and backups
+*.sql.gz
+*.dump
+*.bak
+backups/
+db-dumps/
+
+# Local media / uploads
+uploads/
+local-media/
+**/wwwroot/uploads/
+
+# Logs and debug
+*.log
+logs/
+**/logs/
+debug/
+*.diag
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vs/
+.idea/
+
+# Node
+**/node_modules/
+**/dist/
+**/.next/
+
+# .NET
+**/bin/
+**/obj/
+
+# Python
+**/.venv/
+**/__pycache__/
+
+# Published deployment artifacts (not source of truth)
+/publish/
+/publish-chat/
+
+# Local agent / IDE tooling
+.continue/
+
+# Nested IDE / local junk
+**/.idea/
+**/*.DotSettings.user
+**/logs-api.*

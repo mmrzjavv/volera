@@ -1,0 +1,26 @@
+---
+description: EF Core, PostgreSQL, and related data stores
+globs: backend-core/src/Infrastructure/**/*.{cs,csproj}
+alwaysApply: false
+---
+
+# Database and persistence
+
+- Primary DB: **PostgreSQL** via `UseNpgsql` and `ConnectionStrings:DefaultConnection`.
+- Context: `Infrastructure.Persistence.ApplicationDbContext`.
+- Migrations: `backend-core/src/Infrastructure/Migrations/` — add via EF tools; keep snapshot consistent.
+- Startup applies `Database.Migrate()` and seed (`DatabaseInitializer`).
+- Hangfire uses PostgreSQL storage.
+- Redis / Mongo are optional (connection string keys exist); compose file may not run them — do not assume local Redis/Mongo unless configured.
+- Tests often use EF InMemory — keep production provider Npgsql.
+- Docker Compose DB: service `postgres` (`postgres:16-alpine`), password from `POSTGRES_PASSWORD` in `.env`.
+- AI widget RAG (`chat-ai-module`) reads the same Postgres (`DATABASE_URL`) including `AiContentBlocks` — coordinate schema changes with that service.
+
+## Commands
+
+```bash
+dotnet ef database update --project src/Infrastructure --startup-project src/WebAPI
+dotnet ef migrations add <Name> --project src/Infrastructure --startup-project src/WebAPI
+```
+
+Run from `backend-core/`.

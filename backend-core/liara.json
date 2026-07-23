@@ -1,0 +1,8 @@
+{
+    "app": "voice-call-app",
+    "port": 3000,
+    "build": {
+        "location": "Iran"
+    },
+    "disks": []
+}

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sample page – Chat widget &amp; AI widget</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      padding: 2rem;
+      background: linear-gradient(135deg, #f8f4ff 0%, #f0ecf7 100%);
+      color: #1a1a1a;
+    }
+    .container { max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .sub { color: #555; font-size: 0.9375rem; margin-bottom: 2rem; }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      margin-bottom: 1.5rem;
+    }
+    .card h2 { font-size: 1rem; font-weight: 600; margin: 0 0 0.75rem 0; color: #333; }
+    .card p { margin: 0; font-size: 0.875rem; line-height: 1.5; color: #555; }
+    .card ul { margin: 0.5rem 0 0 1.25rem; padding: 0; font-size: 0.875rem; line-height: 1.6; color: #555; }
+    code { background: #f0f0f0; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.85em; }
+    .features { display: grid; gap: 0.5rem; margin-top: 0.75rem; }
+    .feature { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: #444; }
+    .feature span:first-child { font-size: 1.1rem; }
+    a { color: #88207a; font-weight: 500; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Sample page – Chat widget &amp; AI widget</h1>
+    <p class="sub">This page embeds both the <strong>company chat widget</strong> (talk to support) and the <strong>AI widget</strong> (chatbot). Chat: bottom-left. AI: bottom-right.</p>
+
+    <div class="card">
+      <h2>1. Chat widget (support chat)</h2>
+      <p>Script: <code>widget.js</code> with <code>data-widget-id="w_uLnrr4wtPydNRBzh"</code>, <code>data-color="88207a"</code>, <code>data-position="bottom-left"</code>.</p>
+      <p>Widget ID is used directly so "Start chat" works without resolving by branch. You can also use <code>data-branch="&lt;branch-guid&gt;"</code> instead of <code>data-widget-id</code> to resolve the widget by branch.</p>
+    </div>
+
+    <div class="card">
+      <h2>2. AI widget (chatbot)</h2>
+      <p>Script: <code>ai-widget.js</code> with <code>data-widget-id="w_uLnrr4wtPydNRBzh"</code> (same as chat widget so both use the same branch), <code>data-color="0d9488"</code>, <code>data-position="bottom-right"</code>. Requires SignalR (loaded below).</p>
+      <p>You can use <code>data-widget-id</code> (as here) so the AI widget uses the same branch as the chat widget, or <code>data-branch="&lt;branch-guid&gt;"</code>. The branch must have AI widget set up and content indexed in Admin → AI Widget.</p>
+    </div>
+
+    <div class="card">
+      <h2>Chat widget abilities</h2>
+      <ul class="features">
+        <li class="feature"><span>💬</span> <strong>Text messages</strong> – Send and receive messages in real time.</li>
+        <li class="feature"><span>📎</span> <strong>File attach</strong> – Use the paperclip to upload images, PDFs, or documents; the link is sent in the next message.</li>
+        <li class="feature"><span>↩️</span> <strong>Reply</strong> – Click "Reply" on any support message to quote it; reply preview appears above the input with a clear button.</li>
+        <li class="feature"><span>👍</span> <strong>Reactions</strong> – Support agents can add emoji reactions to messages; they appear under the message and update live.</li>
+      </ul>
+      <p style="margin-top: 0.75rem;">Real-time updates (new messages, reaction changes) are delivered over SignalR while the chat is open.</p>
+    </div>
+
+    <div class="card">
+      <h2>Support agents</h2>
+      <p>To see and answer client messages in real time, log in as a <strong>support user</strong> at:</p>
+      <p style="margin-top: 0.5rem;"><a href="http://localhost:3000/support">Support panel (login &amp; chat with file, reply, reactions)</a></p>
+      <p style="margin-top: 0.75rem; font-size: 0.8125rem; color: #666;">Support and clients share the same abilities: text, file attach, reply. Support can also add reactions to branch messages; the widget shows them and updates live.</p>
+    </div>
+    <div class="card" style="border-left:4px solid #88207a;">
+      <h2>How to open this page</h2>
+      <p><strong>Ensure the .NET backend is running</strong> (e.g. <code>dotnet run</code> in the WebAPI project). Then open this page from <em>any</em> origin:</p>
+      <ul style="margin:0.5rem 0 0 1.25rem; padding:0; font-size:0.875rem;">
+        <li>Via backend: <a href="http://localhost:5002/sample-widget.html">http://localhost:5002/sample-widget.html</a></li>
+        <li>Or via Live Server / static server (e.g. port 5500) – the widgets load from the backend URL above.</li>
+      </ul>
+      <p style="margin-top:0.5rem; font-size:0.8125rem;">If the backend runs on another host/port, set <code>window.WIDGET_BACKEND_URL</code> before the widget scripts (see source).</p>
+    </div>
+  </div>
+
+  <!-- Backend URL: change if your backend runs on another host/port (e.g. http://127.0.0.1:5002). -->
+  <script>window.WIDGET_BACKEND_URL = window.WIDGET_BACKEND_URL || 'http://localhost:5002';</script>
+  <!-- SignalR from same origin (wwwroot/lib) — do not use foreign CDNs -->
+  <script>
+    (function () {
+      var base = (window.WIDGET_BACKEND_URL || '').replace(/\/$/, '') || 'http://localhost:5002';
+      var s = document.createElement('script');
+      s.src = base + '/lib/signalr.min.js';
+      document.head.appendChild(s);
+    })();
+  </script>
+  <!-- Chat widget (bottom-left) and AI widget (bottom-right) – loaded from backend so they work when this page is opened from any origin (e.g. Live Server on 5500). -->
+  <script>
+    (function () {
+      var base = (window.WIDGET_BACKEND_URL || '').replace(/\/$/, '');
+      if (!base) base = 'http://localhost:5002';
+      var w = document.createElement('script');
+      w.src = base + '/widget.js';
+      w.setAttribute('data-widget-id', 'w_uLnrr4wtPydNRBzh');
+      w.setAttribute('data-color', '88207a');
+      w.setAttribute('data-position', 'bottom-left');
+      document.currentScript.after(w);
+      var a = document.createElement('script');
+      a.src = base + '/ai-widget.js';
+      a.setAttribute('data-widget-id', 'w_uLnrr4wtPydNRBzh');
+      a.setAttribute('data-color', '0d9488');
+      a.setAttribute('data-position', 'bottom-right');
+      document.currentScript.after(a);
+    })();
+  </script>
+</body>
+</html>

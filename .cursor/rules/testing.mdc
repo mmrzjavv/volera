@@ -1,0 +1,32 @@
+---
+description: Where and how to add tests in this repo
+globs: "{backend-core/tests,backend-core/src/Tests,chat-ai-module/tests}/**/*"
+alwaysApply: false
+---
+
+# Testing
+
+## Backend
+
+- Projects: `backend-core/tests/Tests` and `backend-core/src/Tests/UnitTests` (both in `VoiceCallApp.sln`).
+- Stack: xUnit, Moq; FluentAssertions in `src/Tests/UnitTests`.
+- Prefer handler unit tests with mocked repositories; repository/integration tests may use EF InMemory.
+- Run: `dotnet test VoiceCallApp.sln` from `backend-core/`.
+- CI runs tests with `continue-on-error: true` — still keep them green when you touch covered code.
+
+## Python AI
+
+- Location: `chat-ai-module/tests/`.
+- Run: `pytest tests/ -v` from `chat-ai-module/`.
+
+## Frontends
+
+- No first-class unit-test scripts in `package.json` today.
+- Validate with `npm run lint` and `npm run build` when changing UI/contracts.
+- Do not add Jest/Vitest/Playwright scaffolding unless the user requests it.
+
+## Guidance
+
+- Add tests next to the style of neighboring test files.
+- Cover authz-sensitive and CQRS handler edge cases when changing them.
+- Do not require live Postgres/Ollama for unit tests unless explicitly building integration tests.

@@ -1,0 +1,101 @@
+# Runs only the app containers; uses your existing postgres/redis/mongo/minio on network chat-app-net.
+# Usage (from backend-core):
+#   docker network create chat-app-net   # once
+#   docker network connect chat-app-net postgres
+#   docker network connect chat-app-net redis
+#   docker network connect chat-app-net mongo
+#   docker network connect chat-app-net minio
+#   docker compose -f docker-compose.existing.yml --env-file .env.docker up -d --build
+
+services:
+  webapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chat-webapi
+    ports:
+      - "24051:8080"
+    depends_on:
+      - coturn
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      ConnectionStrings__MongoDb: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/VoiceCallApp?authSource=admin"
+      Storage__AccessKey: "${MINIO_ACCESS_KEY}"
+      Storage__SecretKey: "${MINIO_SECRET_KEY}"
+      Storage__BucketName: "${MINIO_BUCKET}"
+      Storage__EndpointUrl: "http://minio:9000"
+      Storage__PublicEndpointUrl: "http://localhost:9000"
+      Storage__UseSsl: "false"
+      Storage__Region: "us-east-1"
+      Jwt__Key: "${JWT_SECRET}"
+      Jwt__Issuer: "Volera"
+      Jwt__Audience: "Volera"
+      Jwt__SupportUser__Key: "${JWT_SECRET}"
+      Auth__AllowDemoCompanyOtp: "false"
+      SeedAdmin__Username: "${SEED_ADMIN_USERNAME}"
+      SeedAdmin__Password: "${SEED_ADMIN_PASSWORD}"
+      SeedAdmin__FirstName: Admin
+      SeedAdmin__LastName: User
+      SeedAdmin__PhoneNumber: "${SEED_ADMIN_PHONE}"
+      AiService__BaseUrl: "http://host.docker.internal:8000"
+      COTURN_ENABLED: "${COTURN_ENABLED:-true}"
+      TURN_PUBLIC_HOST: "${TURN_PUBLIC_HOST:-}"
+      TURN_PORT: "${TURN_PORT:-3478}"
+      TURN_USERNAME: "${TURN_USERNAME:-volera}"
+      TURN_CREDENTIAL: "${TURN_CREDENTIAL:-changeme_turn_credential}"
+      WebRtc__CoturnEnabled: "${COTURN_ENABLED:-true}"
+      WebRtc__PublicHost: "${TURN_PUBLIC_HOST:-}"
+      WebRtc__Port: "${TURN_PORT:-3478}"
+      WebRtc__TurnUsername: "${TURN_USERNAME:-volera}"
+      WebRtc__TurnCredential: "${TURN_CREDENTIAL:-changeme_turn_credential}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - chat-app-net
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: chat-coturn
+    restart: unless-stopped
+    ports:
+      - "${TURN_PORT:-3478}:3478/udp"
+      - "${TURN_PORT:-3478}:3478/tcp"
+      - "40000-40050:40000-40050/udp"
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf
+      - --external-ip=${TURN_EXTERNAL_IP:-${TURN_PUBLIC_HOST:-127.0.0.1}}
+      - --realm=${TURN_REALM:-volera}
+      - --user=${TURN_USERNAME:-volera}:${TURN_CREDENTIAL:-changeme_turn_credential}
+      - --listening-port=3478
+      - --min-port=40000
+      - --max-port=40050
+      - --fingerprint
+      - --lt-cred-mech
+      - --no-cli
+      - --log-file=stdout
+    networks:
+      - chat-app-net
+
+  frontend:
+    build:
+      context: ../velora-frontend
+      dockerfile: Dockerfile
+    container_name: chat-frontend
+    ports:
+      - "22820:80"
+    depends_on:
+      - webapi
+    networks:
+      - chat-app-net
+    restart: unless-stopped
+
+networks:
+  chat-app-net:
+    external: true

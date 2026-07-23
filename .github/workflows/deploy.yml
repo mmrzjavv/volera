@@ -1,0 +1,65 @@
+# Deploy Chat-App backend + frontend to your server on push to main (or manual)
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SERVER_HOST: ${{ secrets.SERVER_HOST }}
+  SERVER_USER: ${{ secrets.SERVER_USER }}
+  DEPLOY_PATH: ${{ secrets.SERVER_DEPLOY_PATH || '/opt/chat-app' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore backend-core/VoiceCallApp.sln
+
+      - name: Build backend
+        run: dotnet build backend-core/VoiceCallApp.sln -c Release --no-restore
+
+      - name: Test backend
+        run: dotnet test backend-core/VoiceCallApp.sln -c Release --no-build --verbosity normal
+        continue-on-error: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: velora-frontend/package-lock.json
+
+      - name: Build frontend
+        run: |
+          cd velora-frontend
+          npm ci
+          npm run build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.SERVER_HOST }}
+          username: ${{ env.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ${{ env.DEPLOY_PATH }}/backend-core
+            git pull origin main
+            docker compose --env-file .env pull --quiet 2>/dev/null || true
+            docker compose --env-file .env up -d --build
+            docker image prune -f

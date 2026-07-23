@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+/* Self-hosted / local fonts only — do not load jsDelivr or Google Fonts at runtime.
+   Place Vazirmatn woff2 files under /fonts/vazirmatn/ when available; otherwise system UI fonts. */
+@font-face {
+  font-family: "Vazirmatn";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: local("Vazirmatn"), url("/fonts/vazirmatn/Vazirmatn[wght].woff2") format("woff2");
+}
+
+/* Tailwind v4: use class for dark mode so Light/Dark theme switch works (not system preference only) */
+@custom-variant dark (&&:where(.dark, .dark *));
+
+/*
+  Volera design tokens — original teal/slate system (not Telegram branding).
+*/
+:root {
+  --volera-bg: #f4f7f6;
+  --volera-surface: #ffffff;
+  --volera-surface-muted: #e8efec;
+  --volera-border: #d5e0db;
+  --volera-text: #0f1c1a;
+  --volera-text-muted: #5a6b66;
+  --volera-accent: #0f766e;
+  --volera-accent-hover: #0d9488;
+  --volera-danger: #b91c1c;
+  --volera-radius-sm: 0.5rem;
+  --volera-radius-md: 0.875rem;
+  --volera-radius-lg: 1.25rem;
+  --volera-space-1: 0.25rem;
+  --volera-space-2: 0.5rem;
+  --volera-space-3: 0.75rem;
+  --volera-space-4: 1rem;
+  --volera-shadow: 0 1px 2px rgb(15 28 26 / 0.06);
+  --volera-motion: 160ms ease;
+  --volera-z-nav: 40;
+  --volera-z-modal: 50;
+  --volera-focus: 0 0 0 3px rgb(15 118 110 / 0.35);
+
+  --chat-bubble-me: #0f766e;
+  --chat-bubble-other: #ffffff;
+  --chat-bubble-other-border: #d5e0db;
+  --chat-bg: transparent;
+}
+
+.dark {
+  --volera-bg: #0b1412;
+  --volera-surface: #121c1a;
+  --volera-surface-muted: #1a2623;
+  --volera-border: #2a3a36;
+  --volera-text: #e7f0ed;
+  --volera-text-muted: #9bb0a9;
+  --volera-accent: #2dd4bf;
+  --volera-accent-hover: #5eead4;
+  --volera-danger: #f87171;
+  --volera-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+  --volera-focus: 0 0 0 3px rgb(45 212 191 / 0.35);
+
+  --chat-bubble-other: #1a2623;
+  --chat-bubble-other-border: #2a3a36;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --volera-motion: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.volera-shell {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgb(15 118 110 / 0.08), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgb(13 148 136 / 0.06), transparent 50%),
+    var(--volera-bg);
+  color: var(--volera-text);
+}
+
+.volera-panel {
+  background: var(--volera-surface);
+  border: 1px solid var(--volera-border);
+  border-radius: var(--volera-radius-lg);
+  box-shadow: var(--volera-shadow);
+}
+
+.volera-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--volera-space-3);
+  padding: var(--volera-space-4);
+  min-height: 12rem;
+}
+
+.volera-empty__mark {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 1.25rem;
+  background: linear-gradient(145deg, var(--volera-accent), #115e59);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.04em;
+}
+
+.chat-messages-area {
+  background: var(--chat-bg, var(--volera-bg));
+}
+.dark .chat-messages-area {
+  background: var(--chat-bg, #070f0d);
+}
+
+@media (min-width: 768px) {
+  .chat-messages-area {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+}
+
+/* Adaptive layout helpers */
+.volera-chat-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+@media (min-width: 768px) {
+  .volera-chat-layout {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  }
+}
+@media (min-width: 1280px) {
+  .volera-chat-layout.is-details-open {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(280px, 340px);
+  }
+}
+
+.message-input-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.6) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.dark .message-input-scrollbar {
+  scrollbar-color: rgba(75, 85, 99, 0.6) transparent;
+}
+.message-input-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.message-input-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.message-input-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+.message-input-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.8);
+}
+.dark .message-input-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+}
+.dark .message-input-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.8);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family:
+      "Vazirmatn",
+      "Segoe UI",
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Helvetica Neue",
+      Arial,
+      sans-serif;
+    background: var(--volera-bg);
+    color: var(--volera-text);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--volera-focus);
+  }
+}

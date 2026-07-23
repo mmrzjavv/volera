@@ -1,0 +1,112 @@
+# App + Coturn STUN/TURN — uses your existing Postgres on Docker network chat-app-net
+# (container name: postgres). Does not create a new database container.
+#
+# From backend-core:
+#   docker compose --env-file .env up -d --build
+#
+# Cross-network WebRTC (users not on the same LAN) needs Coturn reachable at:
+#   TURN_PUBLIC_HOST:3478 (UDP+TCP) and UDP 40000-40050
+# Set TURN_PUBLIC_HOST / TURN_EXTERNAL_IP to your server public IP or DNS (not "coturn").
+
+services:
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: chat-coturn
+    restart: unless-stopped
+    ports:
+      - "${TURN_PORT:-3478}:3478/udp"
+      - "${TURN_PORT:-3478}:3478/tcp"
+      - "40000-40050:40000-40050/udp"
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf
+      # Advertised address for ICE candidates — must be reachable by browsers
+      - --external-ip=${TURN_EXTERNAL_IP:-${TURN_PUBLIC_HOST:-127.0.0.1}}
+      - --realm=${TURN_REALM:-volera}
+      - --user=${TURN_USERNAME:-volera}:${TURN_CREDENTIAL:-changeme_turn_credential}
+      - --listening-port=3478
+      - --min-port=40000
+      - --max-port=40050
+      - --fingerprint
+      - --lt-cred-mech
+      - --no-cli
+      - --log-file=stdout
+    networks:
+      - chat-app-net
+
+  webapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chat-webapi
+    ports:
+      - "18327:8080"
+    depends_on:
+      - coturn
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-appdb};Username=${POSTGRES_USER:-root};Password=${POSTGRES_PASSWORD}"
+      SeedDemo__Enabled: "${SEED_DEMO_ENABLED:-true}"
+      Jwt__Key: "${Jwt__Key}"
+      Jwt__Issuer: "${Jwt__Issuer:-Volera}"
+      Jwt__Audience: "${Jwt__Audience:-Volera}"
+      Jwt__SupportUser__Key: "${Jwt__SupportUser__Key:-${Jwt__Key}}"
+      AiService__BaseUrl: "http://host.docker.internal:8000"
+      # Existing MinIO on chat-app-net (container name: minio, host port 9000)
+      Storage__AccessKey: "${MINIO_ACCESS_KEY:-${Storage__AccessKey}}"
+      Storage__SecretKey: "${MINIO_SECRET_KEY:-${Storage__SecretKey}}"
+      Storage__BucketName: "${MINIO_BUCKET:-${Storage__BucketName:-voice-call-app}}"
+      Storage__EndpointUrl: "${Storage__EndpointUrl:-http://minio:9000}"
+      # RequestHost: sign against the browser Host (LAN phone-safe). Fallback URL used by outbox/background.
+      Storage__PublicEndpointMode: "${Storage__PublicEndpointMode:-RequestHost}"
+      # Must match the HTTPS frontend URL browsers use (LAN mic/camera need TLS).
+      Storage__PublicEndpointUrl: "${Storage__PublicEndpointUrl:-https://192.168.1.4:18262}"
+      # MinIO inside Docker is plain HTTP — do not flip this with the public HTTPS URL.
+      Storage__UseSsl: "${Storage__UseSsl:-false}"
+      Storage__Region: "${Storage__Region:-us-east-1}"
+      # WebRTC — Coturn. Browsers load stun/turn from GET /api/v1/Call/ice-servers
+      COTURN_ENABLED: "${COTURN_ENABLED:-true}"
+      TURN_PUBLIC_HOST: "${TURN_PUBLIC_HOST:-}"
+      TURN_PORT: "${TURN_PORT:-3478}"
+      TURN_USERNAME: "${TURN_USERNAME:-volera}"
+      TURN_CREDENTIAL: "${TURN_CREDENTIAL:-changeme_turn_credential}"
+      STUN_SERVER_URL: "${STUN_SERVER_URL:-}"
+      TURN_SERVER_URL: "${TURN_SERVER_URL:-}"
+      WebRtc__CoturnEnabled: "${COTURN_ENABLED:-true}"
+      WebRtc__PublicHost: "${TURN_PUBLIC_HOST:-}"
+      WebRtc__Port: "${TURN_PORT:-3478}"
+      WebRtc__TurnUsername: "${TURN_USERNAME:-volera}"
+      WebRtc__TurnCredential: "${TURN_CREDENTIAL:-changeme_turn_credential}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - chat-app-net
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../velora-frontend
+      dockerfile: Dockerfile
+    container_name: chat-frontend
+    ports:
+      # HTTPS (calls / mic / camera) — open https://<lan-ip>:18262 and accept the cert once
+      - "18262:443"
+      # HTTP redirect → HTTPS
+      - "18261:80"
+    environment:
+      PUBLIC_HTTPS_PORT: "18262"
+      # Comma-separated LAN IPs/DNS baked into the self-signed cert SAN
+      TLS_EXTRA_IPS: "${TLS_EXTRA_IPS:-192.168.1.4}"
+      TLS_EXTRA_DNS: "${TLS_EXTRA_DNS:-localhost}"
+    depends_on:
+      - webapi
+    networks:
+      - chat-app-net
+    restart: unless-stopped
+
+networks:
+  chat-app-net:
+    external: true

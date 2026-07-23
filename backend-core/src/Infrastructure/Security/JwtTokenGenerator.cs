@@ -1,0 +1,86 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using Core.Domain.Entities;
+using Core.Application.Interfaces;
+
+namespace Infrastructure.Security;
+
+public class JwtTokenGenerator : IJwtTokenGenerator
+{
+    private readonly string _key;
+    private readonly string _issuer;
+    private readonly string _audience;
+
+    public JwtTokenGenerator(IConfiguration configuration)
+    {
+        _key = JwtConfiguration.RequireSigningKey(configuration, "Jwt:Key");
+        _issuer = configuration["Jwt:Issuer"] ?? "Volera";
+        _audience = configuration["Jwt:Audience"] ?? "Volera";
+    }
+
+    public string GenerateToken(User user)
+    {
+        return GenerateToken(user, Guid.Empty);
+    }
+
+    public string GenerateToken(User user, Guid sessionId)
+    {
+        var claims = new List<Claim>
+        {
+            new Claim("userId", user.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Role, user.Role.ToRoleName()),
+            new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim("firstName", user.FirstName),
+            new Claim("lastName", user.LastName)
+        };
+        if (sessionId != Guid.Empty)
+            claims.Add(new Claim("sessionId", sessionId.ToString()));
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_key));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _issuer,
+            audience: _audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public string GenerateRefreshToken()
+    {
+        return Guid.NewGuid().ToString();
+    }
+
+    public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+    {
+        var tokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = true,
+            ValidateIssuer = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_key)),
+            ValidateLifetime = false,
+            ValidIssuer = _issuer,
+            ValidAudience = _audience
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken securityToken);
+        
+        if (securityToken is not JwtSecurityToken jwtSecurityToken || 
+            !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+        {
+            throw new SecurityTokenException("Invalid token");
+        }
+
+        return principal;
+    }
+}

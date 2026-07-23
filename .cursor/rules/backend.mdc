@@ -1,0 +1,40 @@
+---
+description: ASP.NET Core Clean Architecture and CQRS conventions
+globs: backend-core/**/*.{cs,csproj}
+alwaysApply: false
+---
+
+# Backend (`backend-core`)
+
+## Layers
+
+- `Core.Domain` ← `Core.Application` ← `Infrastructure` / `WebAPI`
+- Domain must not reference Infrastructure or WebAPI.
+- Solution: `backend-core/VoiceCallApp.sln` (TFM `net9.0`).
+
+## Feature pattern
+
+1. Add `XxxCommand` / `XxxQuery` under `Core.Application/Commands|Queries` (admin: `Administration/`).
+2. Add handler (prefer `Handlers/`).
+3. Add FluentValidation validator — pipeline **requires** one per request type.
+4. Thin controller under `WebAPI/Controllers` → `IMediator.Send`.
+5. Return `ApiResponse` via controller extensions (`Success` / `Fail` / `ApiNotFound`).
+
+## Routes and auth
+
+- Prefix routes with `api/v1/...`.
+- Schemes: default `Bearer`; support portal uses `SupportUser`.
+- Policies: `Admin`, `CompanyAdmin`, `SupportManager`, `SupportAgent`.
+- Hubs: `/callHub`, `/chatHub`, `/guestHub`, `/companyWidgetHub`, `/supportHub`, `/aiWidgetHub`.
+
+## Data
+
+- DbContext: `ApplicationDbContext`; migrations in `Infrastructure/Migrations`.
+- Provider in use: PostgreSQL via Npgsql.
+- After model changes: `dotnet ef migrations add ... --project src/Infrastructure --startup-project src/WebAPI`.
+
+## Do not
+
+- Expand orphan `src/Web/` (not a real project).
+- Hand-edit published outputs under `publish*` .
+- Drop validators or widen anonymous access on authenticated hubs without explicit request.

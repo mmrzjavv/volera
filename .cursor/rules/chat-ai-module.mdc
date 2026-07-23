@@ -1,0 +1,15 @@
+---
+description: FastAPI chat-ai-module conventions
+globs: chat-ai-module/**/*.{py,toml,txt,md}
+alwaysApply: false
+---
+
+# Chat AI module (`chat-ai-module`)
+
+- FastAPI entry: `main.py`; run `uvicorn main:app --reload --host 0.0.0.0 --port 8000`.
+- Default LLM/embeddings: **Ollama** (see `.env.example`). OpenAI is optional via config.
+- Widget integration paths: `POST /embed`, `POST /chat` (used by .NET AI widget).
+- `DATABASE_URL` must target the **same Postgres** as `backend-core` for RAG (`AiContentBlocks`).
+- Tests: `pytest tests/ -v`.
+- Keep secrets out of `.env.example`; use placeholders only.
+- Do not require OpenAI keys unless switching `LLM_PROVIDER` / `EMBEDDING_PROVIDER`.

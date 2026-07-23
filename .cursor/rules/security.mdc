@@ -1,0 +1,16 @@
+---
+description: Auth, secrets, and safe data-handling rules
+alwaysApply: true
+---
+
+# Security
+
+- Never commit or document real secrets (JWT keys, DB passwords, API keys, VAPID private keys, storage keys).
+- Prefer env / user-secrets / server `.env` over hardcoding. Example templates: `backend-core/.env.example`, `chat-ai-module/.env.example`, `admin-panel/.env.local.example`.
+- Do not copy values from `.continue/agents/*.yaml`, local `.env*`, or `appsettings` secret fields into chat replies or docs.
+- Respect auth schemes: end-user `Bearer`, support `SupportUser`, company `X-Company-Token`.
+- Keep authenticated SignalR hubs authorized; guest/widget anonymity is intentional for those hubs only.
+- Validate inputs with FluentValidation on new MediatR requests.
+- Avoid logging tokens, passwords, or full message payloads with PII.
+- Uploads/storage use configured `Storage:*` keys — do not embed credentials in client code.
+- Treat `docs/DEPLOY-SERVER.md` host/IP details as operational; do not add new private credentials there.

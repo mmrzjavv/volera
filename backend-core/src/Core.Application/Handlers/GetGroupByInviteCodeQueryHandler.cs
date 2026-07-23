@@ -1,0 +1,36 @@
+using Core.Application.DTOs;
+using Core.Application.Queries;
+using Core.Domain.Interfaces;
+using MediatR;
+
+namespace Core.Application.Handlers;
+
+public class GetGroupByInviteCodeQueryHandler : IRequestHandler<GetGroupByInviteCodeQuery, GroupDetailsDto>
+{
+    private readonly IGroupRepository _groupRepository;
+
+    public GetGroupByInviteCodeQueryHandler(IGroupRepository groupRepository)
+    {
+        _groupRepository = groupRepository;
+    }
+
+    public async Task<GroupDetailsDto> Handle(GetGroupByInviteCodeQuery request, CancellationToken cancellationToken)
+    {
+        var group = await _groupRepository.GetByInviteCodeAsync(request.InviteCode);
+        if (group == null)
+            throw new KeyNotFoundException("Invalid invite code.");
+
+        return new GroupDetailsDto
+        {
+            Id = group.Id,
+            Name = group.Name,
+            AdminId = group.AdminId,
+            CreatedAt = group.CreatedAt,
+            Description = group.Description,
+            ProfilePictureUrl = group.ProfilePictureUrl,
+            InviteCode = group.InviteCode,
+            Members = new List<UserDto>()
+        };
+    }
+}
+

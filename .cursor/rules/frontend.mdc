@@ -1,0 +1,34 @@
+---
+description: React/Vite and Next.js frontend conventions
+globs: "{velora-frontend,admin-panel}/**/*.{ts,tsx,css,js,jsx}"
+alwaysApply: false
+---
+
+# Frontends
+
+## `velora-frontend` (end-user PWA + platform admin)
+
+- React 19 + Vite 7 + Zustand + Tailwind **v4**.
+- HTTP: axios (`src/services/api.ts`) → `/api/v1`, Bearer + refresh.
+- SignalR in stores: `/chatHub`, `/callHub` via `accessTokenFactory`.
+- Tokens in `localStorage`: `token`, `refreshToken`, `user`.
+- No `@/` alias — relative imports.
+- Dev proxy → `http://localhost:5002`.
+- Env: `VITE_API_URL`, optional `VITE_ENABLE_MESSAGE_LENGTH_LIMIT`.
+- Scripts: `npm run dev|build|lint|preview`.
+
+## `admin-panel` (company widget SaaS)
+
+- Next.js 14 App Router + Zustand + Tailwind **v3**.
+- HTTP: `fetch` in `src/lib/api.ts` (not axios). Alias `@/*`.
+- Company auth: `X-Company-Token` + `widget_admin_company` in localStorage.
+- Support auth: Bearer + `widget_admin_support`; hubs via `?access_token=`.
+- Env: `NEXT_PUBLIC_API_URL` (see `.env.local.example`).
+- Scripts: `npm run dev|build|start|lint`.
+- Plan limits may still use `MOCK_PLANS`; APIs for company/support/AI widget are real.
+
+## Shared rules
+
+- Match existing `ApiResponse<T>` envelope (`success`, `data`, `message`, `operationDate`).
+- After API/SignalR contract changes, update the correct app only.
+- Do not “unify” the two frontends’ HTTP stacks without an explicit request.

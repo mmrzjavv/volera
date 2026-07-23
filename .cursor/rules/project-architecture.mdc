@@ -1,0 +1,16 @@
+---
+description: Core repo workflow and safety rules for all agents
+alwaysApply: true
+---
+
+# Project core
+
+- Monorepo: `backend-core` (.NET 9 API), `velora-frontend` (React/Vite), `admin-panel` (Next.js), `chat-ai-module` (FastAPI).
+- Read `AGENTS.md` and nearby code before changing architecture.
+- Prefer small, verifiable diffs. Do not touch unrelated apps or `publish/` / `publish-chat/`.
+- Do not invent scripts; use commands documented in `AGENTS.md` / package files.
+- Never commit secrets or paste real connection strings/tokens into docs.
+- Do not commit unless the user explicitly asks.
+- Preserve dirty user changes; avoid drive-by refactors.
+- Backend is net9.0 + PostgreSQL (Npgsql), not the outdated README claim of .NET 8 / SQL Server.
+- Platform admin lives in `velora-frontend` (`/admin`). Company widget admin is `admin-panel`. Do not mix them.
