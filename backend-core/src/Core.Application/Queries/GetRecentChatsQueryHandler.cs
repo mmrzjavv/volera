@@ -14,6 +14,7 @@ public class GetRecentChatsQueryHandler : IRequestHandler<GetRecentChatsQuery, I
     private readonly IOnlineUserService _onlineUserService;
     private readonly ISavedMessageRepository _savedMessageRepository;
     private readonly IHiddenChatRepository _hiddenChatRepository;
+    private readonly IFileStorageService _fileStorage;
     private readonly ILogger<GetRecentChatsQueryHandler> _logger;
 
     public GetRecentChatsQueryHandler(
@@ -23,6 +24,7 @@ public class GetRecentChatsQueryHandler : IRequestHandler<GetRecentChatsQuery, I
         IOnlineUserService onlineUserService,
         ISavedMessageRepository savedMessageRepository,
         IHiddenChatRepository hiddenChatRepository,
+        IFileStorageService fileStorage,
         ILogger<GetRecentChatsQueryHandler> logger)
     {
         _messageRepository = messageRepository;
@@ -31,6 +33,7 @@ public class GetRecentChatsQueryHandler : IRequestHandler<GetRecentChatsQuery, I
         _onlineUserService = onlineUserService;
         _savedMessageRepository = savedMessageRepository;
         _hiddenChatRepository = hiddenChatRepository;
+        _fileStorage = fileStorage;
         _logger = logger;
     }
 
@@ -116,7 +119,7 @@ public class GetRecentChatsQueryHandler : IRequestHandler<GetRecentChatsQuery, I
                     Name = group.Name,
                     IsGroup = !isChannel,
                     IsChannel = isChannel,
-                    ProfilePicture = group.ProfilePictureUrl,
+                    ProfilePicture = _fileStorage.ResolveClientUrl(group.ProfilePictureUrl),
                     PublicUsername = group.PublicUsername,
                     LastMessageContent = chat.LastMessage?.Content ?? string.Empty,
                     LastMessageAt = chat.LastMessage?.SentAt ?? DateTime.MinValue,
@@ -135,7 +138,7 @@ public class GetRecentChatsQueryHandler : IRequestHandler<GetRecentChatsQuery, I
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     Username = user.Username,
-                    ProfilePicture = user.ProfilePicture,
+                    ProfilePicture = _fileStorage.ResolveClientUrl(user.ProfilePicture),
                     LastMessageContent = chat.LastMessage?.Content ?? string.Empty,
                     LastMessageAt = chat.LastMessage?.SentAt ?? DateTime.MinValue,
                     UnreadCount = chat.UnreadCount,

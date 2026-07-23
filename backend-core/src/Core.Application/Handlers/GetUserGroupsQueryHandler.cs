@@ -1,4 +1,5 @@
 using Core.Application.DTOs;
+using Core.Application.Interfaces;
 using Core.Application.Queries;
 using Core.Domain.Enums;
 using Core.Domain.Interfaces;
@@ -9,10 +10,12 @@ namespace Core.Application.Handlers;
 public class GetUserGroupsQueryHandler : IRequestHandler<GetUserGroupsQuery, List<GroupDto>>
 {
     private readonly IGroupRepository _groupRepository;
+    private readonly IFileStorageService _fileStorage;
 
-    public GetUserGroupsQueryHandler(IGroupRepository groupRepository)
+    public GetUserGroupsQueryHandler(IGroupRepository groupRepository, IFileStorageService fileStorage)
     {
         _groupRepository = groupRepository;
+        _fileStorage = fileStorage;
     }
 
     public async Task<List<GroupDto>> Handle(GetUserGroupsQuery request, CancellationToken cancellationToken)
@@ -26,7 +29,7 @@ public class GetUserGroupsQueryHandler : IRequestHandler<GetUserGroupsQuery, Lis
             CreatedAt = g.CreatedAt,
             Kind = g.Kind.ToString(),
             IsChannel = g.Kind == GroupKind.Channel,
-            ProfilePictureUrl = g.ProfilePictureUrl,
+            ProfilePictureUrl = _fileStorage.ResolveClientUrl(g.ProfilePictureUrl),
             IsPublic = g.IsPublic,
             PublicUsername = g.PublicUsername
         }).ToList();

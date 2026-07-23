@@ -1,4 +1,5 @@
 using Core.Application.DTOs;
+using Core.Application.Interfaces;
 using Core.Application.Queries;
 using Core.Domain.Interfaces;
 using MediatR;
@@ -10,11 +11,16 @@ public class GetGroupDetailsQueryHandler : IRequestHandler<GetGroupDetailsQuery,
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IMapper _mapper;
+    private readonly IFileStorageService _fileStorage;
 
-    public GetGroupDetailsQueryHandler(IGroupRepository groupRepository, IMapper mapper)
+    public GetGroupDetailsQueryHandler(
+        IGroupRepository groupRepository,
+        IMapper mapper,
+        IFileStorageService fileStorage)
     {
         _groupRepository = groupRepository;
         _mapper = mapper;
+        _fileStorage = fileStorage;
     }
 
     public async Task<GroupDetailsDto> Handle(GetGroupDetailsQuery request, CancellationToken cancellationToken)
@@ -33,15 +39,19 @@ public class GetGroupDetailsQueryHandler : IRequestHandler<GetGroupDetailsQuery,
             AdminId = group.AdminId,
             CreatedAt = group.CreatedAt,
             Description = group.Description,
-            ProfilePictureUrl = group.ProfilePictureUrl,
+            ProfilePictureUrl = _fileStorage.ResolveClientUrl(group.ProfilePictureUrl),
             InviteCode = group.InviteCode,
             Members = group.Members
                 .OrderBy(m => m.JoinedAt)
-                .Select(m => _mapper.Map<UserDto>(m.User))
+                .Select(m =>
+                {
+                    var user = _mapper.Map<UserDto>(m.User);
+                    user.ProfilePicture = _fileStorage.ResolveClientUrl(user.ProfilePicture);
+                    return user;
+                })
                 .ToList()
         };
 
         return dto;
     }
 }
-

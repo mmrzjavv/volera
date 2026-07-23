@@ -1,4 +1,5 @@
 using Core.Application.DTOs;
+using Core.Application.Interfaces;
 using Core.Application.Queries;
 using Core.Domain.Entities;
 using Core.Domain.Enums;
@@ -10,8 +11,13 @@ namespace Core.Application.Handlers;
 public class GetMyChannelsQueryHandler : IRequestHandler<GetMyChannelsQuery, List<GroupDto>>
 {
     private readonly IGroupRepository _groupRepository;
+    private readonly IFileStorageService _fileStorage;
 
-    public GetMyChannelsQueryHandler(IGroupRepository groupRepository) => _groupRepository = groupRepository;
+    public GetMyChannelsQueryHandler(IGroupRepository groupRepository, IFileStorageService fileStorage)
+    {
+        _groupRepository = groupRepository;
+        _fileStorage = fileStorage;
+    }
 
     public async Task<List<GroupDto>> Handle(GetMyChannelsQuery request, CancellationToken cancellationToken)
     {
@@ -24,7 +30,7 @@ public class GetMyChannelsQueryHandler : IRequestHandler<GetMyChannelsQuery, Lis
             CreatedAt = g.CreatedAt,
             Kind = GroupKind.Channel.ToString(),
             IsChannel = true,
-            ProfilePictureUrl = g.ProfilePictureUrl,
+            ProfilePictureUrl = _fileStorage.ResolveClientUrl(g.ProfilePictureUrl),
             IsPublic = g.IsPublic,
             PublicUsername = g.PublicUsername,
             CanPost = g.CanUserPost(request.UserId)
@@ -35,8 +41,13 @@ public class GetMyChannelsQueryHandler : IRequestHandler<GetMyChannelsQuery, Lis
 public class GetChannelDetailsQueryHandler : IRequestHandler<GetChannelDetailsQuery, GroupDetailsDto>
 {
     private readonly IGroupRepository _groupRepository;
+    private readonly IFileStorageService _fileStorage;
 
-    public GetChannelDetailsQueryHandler(IGroupRepository groupRepository) => _groupRepository = groupRepository;
+    public GetChannelDetailsQueryHandler(IGroupRepository groupRepository, IFileStorageService fileStorage)
+    {
+        _groupRepository = groupRepository;
+        _fileStorage = fileStorage;
+    }
 
     public async Task<GroupDetailsDto> Handle(GetChannelDetailsQuery request, CancellationToken cancellationToken)
     {
@@ -47,10 +58,14 @@ public class GetChannelDetailsQueryHandler : IRequestHandler<GetChannelDetailsQu
         if (!channel.IsMember(request.CurrentUserId))
             throw new UnauthorizedAccessException("You are not subscribed to this channel.");
 
-        return MapChannelDetails(channel, request.CurrentUserId, includeMembers: true);
+        return MapChannelDetails(channel, request.CurrentUserId, includeMembers: true, _fileStorage);
     }
 
-    internal static GroupDetailsDto MapChannelDetails(Group channel, Guid? currentUserId, bool includeMembers)
+    internal static GroupDetailsDto MapChannelDetails(
+        Group channel,
+        Guid? currentUserId,
+        bool includeMembers,
+        IFileStorageService fileStorage)
     {
         var member = currentUserId.HasValue ? channel.GetMember(currentUserId.Value) : null;
         var isOwner = currentUserId.HasValue && channel.AdminId == currentUserId.Value;
@@ -63,7 +78,7 @@ public class GetChannelDetailsQueryHandler : IRequestHandler<GetChannelDetailsQu
             AdminId = channel.AdminId,
             CreatedAt = channel.CreatedAt,
             Description = channel.Description,
-            ProfilePictureUrl = channel.ProfilePictureUrl,
+            ProfilePictureUrl = fileStorage.ResolveClientUrl(channel.ProfilePictureUrl),
             InviteCode = isAdmin ? channel.InviteCode : null,
             Kind = GroupKind.Channel.ToString(),
             IsChannel = true,
@@ -85,7 +100,7 @@ public class GetChannelDetailsQueryHandler : IRequestHandler<GetChannelDetailsQu
         {
             dto.Admins = channel.Members
                 .Where(m => m.IsAdmin || m.UserId == channel.AdminId)
-                .Select(MapMember)
+                .Select(m => MapMember(m, fileStorage))
                 .ToList();
             dto.Members = channel.Members
                 .OrderBy(m => m.JoinedAt)
@@ -96,7 +111,7 @@ public class GetChannelDetailsQueryHandler : IRequestHandler<GetChannelDetailsQu
                     FirstName = m.User?.FirstName ?? string.Empty,
                     LastName = m.User?.LastName ?? string.Empty,
                     PhoneNumber = m.User?.PhoneNumber ?? string.Empty,
-                    ProfilePicture = m.User?.ProfilePicture,
+                    ProfilePicture = fileStorage.ResolveClientUrl(m.User?.ProfilePicture),
                     IsOnline = false
                 }).ToList();
         }
@@ -104,13 +119,13 @@ public class GetChannelDetailsQueryHandler : IRequestHandler<GetChannelDetailsQu
         return dto;
     }
 
-    private static ChannelMemberDto MapMember(GroupMember m) => new()
+    private static ChannelMemberDto MapMember(GroupMember m, IFileStorageService fileStorage) => new()
     {
         UserId = m.UserId,
         Username = m.User?.Username ?? string.Empty,
         FirstName = m.User?.FirstName ?? string.Empty,
         LastName = m.User?.LastName ?? string.Empty,
-        ProfilePicture = m.User?.ProfilePicture,
+        ProfilePicture = fileStorage.ResolveClientUrl(m.User?.ProfilePicture),
         IsAdmin = m.IsAdmin,
         CanPost = m.CanPost,
         CanEditMessages = m.CanEditMessages,
@@ -125,8 +140,13 @@ public class GetChannelDetailsQueryHandler : IRequestHandler<GetChannelDetailsQu
 public class GetChannelInvitePreviewQueryHandler : IRequestHandler<GetChannelInvitePreviewQuery, GroupDetailsDto>
 {
     private readonly IGroupRepository _groupRepository;
+    private readonly IFileStorageService _fileStorage;
 
-    public GetChannelInvitePreviewQueryHandler(IGroupRepository groupRepository) => _groupRepository = groupRepository;
+    public GetChannelInvitePreviewQueryHandler(IGroupRepository groupRepository, IFileStorageService fileStorage)
+    {
+        _groupRepository = groupRepository;
+        _fileStorage = fileStorage;
+    }
 
     public async Task<GroupDetailsDto> Handle(GetChannelInvitePreviewQuery request, CancellationToken cancellationToken)
     {
@@ -142,7 +162,7 @@ public class GetChannelInvitePreviewQueryHandler : IRequestHandler<GetChannelInv
             AdminId = channel.AdminId,
             CreatedAt = channel.CreatedAt,
             Description = channel.Description,
-            ProfilePictureUrl = channel.ProfilePictureUrl,
+            ProfilePictureUrl = _fileStorage.ResolveClientUrl(channel.ProfilePictureUrl),
             Kind = GroupKind.Channel.ToString(),
             IsChannel = true,
             IsPublic = channel.IsPublic,
@@ -155,8 +175,13 @@ public class GetChannelInvitePreviewQueryHandler : IRequestHandler<GetChannelInv
 public class SearchPublicChannelsQueryHandler : IRequestHandler<SearchPublicChannelsQuery, List<PublicChannelSearchResultDto>>
 {
     private readonly IGroupRepository _groupRepository;
+    private readonly IFileStorageService _fileStorage;
 
-    public SearchPublicChannelsQueryHandler(IGroupRepository groupRepository) => _groupRepository = groupRepository;
+    public SearchPublicChannelsQueryHandler(IGroupRepository groupRepository, IFileStorageService fileStorage)
+    {
+        _groupRepository = groupRepository;
+        _fileStorage = fileStorage;
+    }
 
     public async Task<List<PublicChannelSearchResultDto>> Handle(SearchPublicChannelsQuery request, CancellationToken cancellationToken)
     {
@@ -170,7 +195,7 @@ public class SearchPublicChannelsQueryHandler : IRequestHandler<SearchPublicChan
                 Name = c.Name,
                 PublicUsername = c.PublicUsername,
                 Description = c.Description,
-                ProfilePictureUrl = c.ProfilePictureUrl,
+                ProfilePictureUrl = _fileStorage.ResolveClientUrl(c.ProfilePictureUrl),
                 SubscriberCount = await _groupRepository.GetSubscriberCountAsync(c.Id, cancellationToken)
             });
         }
@@ -181,8 +206,13 @@ public class SearchPublicChannelsQueryHandler : IRequestHandler<SearchPublicChan
 public class GetChannelSubscribersQueryHandler : IRequestHandler<GetChannelSubscribersQuery, List<ChannelMemberDto>>
 {
     private readonly IGroupRepository _groupRepository;
+    private readonly IFileStorageService _fileStorage;
 
-    public GetChannelSubscribersQueryHandler(IGroupRepository groupRepository) => _groupRepository = groupRepository;
+    public GetChannelSubscribersQueryHandler(IGroupRepository groupRepository, IFileStorageService fileStorage)
+    {
+        _groupRepository = groupRepository;
+        _fileStorage = fileStorage;
+    }
 
     public async Task<List<ChannelMemberDto>> Handle(GetChannelSubscribersQuery request, CancellationToken cancellationToken)
     {
@@ -202,7 +232,7 @@ public class GetChannelSubscribersQueryHandler : IRequestHandler<GetChannelSubsc
                 Username = m.User?.Username ?? string.Empty,
                 FirstName = m.User?.FirstName ?? string.Empty,
                 LastName = m.User?.LastName ?? string.Empty,
-                ProfilePicture = m.User?.ProfilePicture,
+                ProfilePicture = _fileStorage.ResolveClientUrl(m.User?.ProfilePicture),
                 IsAdmin = m.IsAdmin,
                 CanPost = m.CanPost,
                 CanEditMessages = m.CanEditMessages,
@@ -288,8 +318,13 @@ public class ListSuggestedPostsQueryHandler : IRequestHandler<ListSuggestedPosts
 public class GetChannelByUsernameQueryHandler : IRequestHandler<GetChannelByUsernameQuery, GroupDetailsDto>
 {
     private readonly IGroupRepository _groupRepository;
+    private readonly IFileStorageService _fileStorage;
 
-    public GetChannelByUsernameQueryHandler(IGroupRepository groupRepository) => _groupRepository = groupRepository;
+    public GetChannelByUsernameQueryHandler(IGroupRepository groupRepository, IFileStorageService fileStorage)
+    {
+        _groupRepository = groupRepository;
+        _fileStorage = fileStorage;
+    }
 
     public async Task<GroupDetailsDto> Handle(GetChannelByUsernameQuery request, CancellationToken cancellationToken)
     {
@@ -299,7 +334,7 @@ public class GetChannelByUsernameQueryHandler : IRequestHandler<GetChannelByUser
             throw new UnauthorizedAccessException("Channel is private.");
 
         if (request.CurrentUserId.HasValue && channel.IsMember(request.CurrentUserId.Value))
-            return GetChannelDetailsQueryHandler.MapChannelDetails(channel, request.CurrentUserId, includeMembers: true);
+            return GetChannelDetailsQueryHandler.MapChannelDetails(channel, request.CurrentUserId, includeMembers: true, _fileStorage);
 
         return new GroupDetailsDto
         {
@@ -308,7 +343,7 @@ public class GetChannelByUsernameQueryHandler : IRequestHandler<GetChannelByUser
             AdminId = channel.AdminId,
             CreatedAt = channel.CreatedAt,
             Description = channel.Description,
-            ProfilePictureUrl = channel.ProfilePictureUrl,
+            ProfilePictureUrl = _fileStorage.ResolveClientUrl(channel.ProfilePictureUrl),
             Kind = GroupKind.Channel.ToString(),
             IsChannel = true,
             IsPublic = true,

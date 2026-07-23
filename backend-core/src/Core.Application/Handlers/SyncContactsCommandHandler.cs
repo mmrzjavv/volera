@@ -1,6 +1,7 @@
 using MediatR;
 using Core.Application.Commands;
 using Core.Application.DTOs;
+using Core.Application.Interfaces;
 using Core.Domain.Interfaces;
 using Core.Domain.Entities;
 
@@ -11,15 +12,18 @@ public class SyncContactsCommandHandler : IRequestHandler<SyncContactsCommand, I
     private readonly IContactRepository _contactRepository;
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IFileStorageService _fileStorage;
 
     public SyncContactsCommandHandler(
         IContactRepository contactRepository,
         IUserRepository userRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IFileStorageService fileStorage)
     {
         _contactRepository = contactRepository;
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;
+        _fileStorage = fileStorage;
     }
 
     public async Task<IEnumerable<ContactDto>> Handle(SyncContactsCommand request, CancellationToken cancellationToken)
@@ -71,7 +75,7 @@ public class SyncContactsCommandHandler : IRequestHandler<SyncContactsCommand, I
                 LastName = item.User.LastName,
                 Username = item.User.Username,
                 PhoneNumber = item.User.PhoneNumber,
-                ProfilePicture = item.User.ProfilePicture,
+                ProfilePicture = _fileStorage.ResolveClientUrl(item.User.ProfilePicture),
                 CreatedAt = item.User.CreatedAt,
                 UpdatedAt = item.User.UpdatedAt
             }

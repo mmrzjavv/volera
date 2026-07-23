@@ -1,6 +1,7 @@
 using MediatR;
 using Core.Application.Queries;
 using Core.Application.DTOs;
+using Core.Application.Interfaces;
 using Core.Domain.Interfaces;
 using Core.Domain.Entities;
 using AutoMapper;
@@ -11,11 +12,16 @@ public class GetContactsQueryHandler : IRequestHandler<GetContactsQuery, IEnumer
 {
     private readonly IContactRepository _contactRepository;
     private readonly IMapper _mapper;
+    private readonly IFileStorageService _fileStorage;
 
-    public GetContactsQueryHandler(IContactRepository contactRepository, IMapper mapper)
+    public GetContactsQueryHandler(
+        IContactRepository contactRepository,
+        IMapper mapper,
+        IFileStorageService fileStorage)
     {
         _contactRepository = contactRepository;
         _mapper = mapper;
+        _fileStorage = fileStorage;
     }
 
     public async Task<IEnumerable<ContactDto>> Handle(GetContactsQuery request, CancellationToken cancellationToken)
@@ -33,6 +39,7 @@ public class GetContactsQueryHandler : IRequestHandler<GetContactsQuery, IEnumer
             if (c.ContactUser != null)
             {
                 dto.ContactUser = _mapper.Map<UserDto>(c.ContactUser);
+                dto.ContactUser.ProfilePicture = _fileStorage.ResolveClientUrl(dto.ContactUser.ProfilePicture);
             }
             return dto;
         });
