@@ -44,10 +44,10 @@ const DESKTOP_ACTIONS_GAP_PX = 8;
 
 function useIsMobile(): boolean {
     const [isMobile, setIsMobile] = useState(() =>
-        typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
     );
     useEffect(() => {
-        const mql = window.matchMedia('(max-width: 640px)');
+        const mql = window.matchMedia('(max-width: 767px)');
         const handler = () => setIsMobile(mql.matches);
         mql.addEventListener('change', handler);
         return () => mql.removeEventListener('change', handler);
@@ -634,14 +634,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMyMessa
                 {/* Actions Menu: overlay on mobile (long-press), inline strip on desktop */}
                 {showActions && !isDeleted && !selectionMode && isMobile && (
                     <div
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pt-[env(safe-area-inset-top,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] pb-[env(safe-area-inset-bottom,0px)] sm:p-4 bg-black/50"
                         onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
                         role="presentation"
                     >
                         <div
-                            className="animate-in fade-in zoom-in-95 duration-200"
+                            className="w-full sm:w-auto max-w-md animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:pb-0"
                             onClick={(e) => e.stopPropagation()}
                         >
+                            <div className="sm:hidden flex justify-center pb-2" aria-hidden>
+                                <div className="w-10 h-1 rounded-full bg-white/40" />
+                            </div>
                             <MessageActions
                                 onEdit={() => { onEdit(message); setShowActions(false); }}
                                 onDelete={() => { onDelete(message.id); setShowActions(false); }}

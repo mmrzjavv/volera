@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCallStore } from '../store/useCallStore';
 import { PhoneOff, Mic, MicOff, PhoneIncoming, Video, VideoOff, Lock, Minimize2, Maximize2, Monitor, MonitorOff, Volume2 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -7,6 +7,22 @@ import { getInitials } from '../utils/getInitials';
 import { supportsSystemAudio } from '../config/call';
 import { canRequestMediaDevices, insecureMediaMessage, suggestedHttpsOrigin } from '../utils/mediaPermissions';
 import { useToastStore } from '../store/useToastStore';
+
+function attachMediaStream(
+  el: HTMLMediaElement | null,
+  stream: MediaStream | null | undefined,
+  options?: { play?: boolean; muted?: boolean; volume?: number }
+) {
+  if (!el || !stream) return;
+  if (el.srcObject !== stream) {
+    el.srcObject = stream;
+  }
+  if (typeof options?.muted === 'boolean') el.muted = options.muted;
+  if (typeof options?.volume === 'number') el.volume = options.volume;
+  if (options?.play !== false) {
+    void el.play().catch(() => {});
+  }
+}
 
 export const CallModal = () => {
   const { 
@@ -53,6 +69,17 @@ export const CallModal = () => {
   const [isAcceptingUi, setIsAcceptingUi] = useState(false);
 
   const showingRemoteScreen = !!(remoteScreenShareUserId && !isScreenSharing);
+  const hasLocalVideoTrack = !!localStream?.getVideoTracks().some((t) => t.readyState !== 'ended');
+
+  // Keep PIP srcObject in sync when the <video> mounts after localStream is already set
+  // (caller path: ensureLocalMedia runs while status === 'idle' and CallModal returns null).
+  const setLocalVideoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      localVideoRef.current = el;
+      attachMediaStream(el, localStream, { muted: true, play: true });
+    },
+    [localStream]
+  );
 
   // Ringtone Management
   useEffect(() => {
@@ -74,13 +101,9 @@ export const CallModal = () => {
   }, [status, isVideo]);
 
   useEffect(() => {
-    if (localAudioRef.current && localStream) {
-      localAudioRef.current.srcObject = localStream;
-    }
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream, isVideo]);
+    attachMediaStream(localAudioRef.current, localStream, { muted: true, play: true });
+    attachMediaStream(localVideoRef.current, localStream, { muted: true, play: true });
+  }, [localStream, isVideo, status]);
 
   // Stream to show for remote video/screen: prefer dedicated screen stream when remote is sharing
   const remoteDisplayStream = (remoteScreenShareUserId && remoteScreenStream) ? remoteScreenStream : remoteStream;
@@ -399,13 +422,19 @@ export const CallModal = () => {
 
                 {/* Local Video (PIP) – responsive: small on mobile, larger on tablet/desktop */}
                 <div className="absolute top-2 right-2 w-20 h-16 sm:top-4 sm:right-4 sm:w-36 sm:h-28 md:w-44 md:h-32 lg:w-48 lg:h-36 bg-black rounded-lg overflow-hidden shadow-lg border-2 border-gray-700 z-10">
-                     <video 
-                        ref={localVideoRef} 
-                        autoPlay 
-                        muted 
-                        playsInline 
-                        className="w-full h-full object-cover transform scale-x-[-1]" 
-                     />
+                     {hasLocalVideoTrack && isVideoEnabled ? (
+                       <video
+                          ref={setLocalVideoRef}
+                          autoPlay
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover transform scale-x-[-1]"
+                       />
+                     ) : (
+                       <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                         <VideoOff className="text-gray-500" size={22} />
+                       </div>
+                     )}
                 </div>
 
                 {/* Call Info Overlay – compact on mobile, scales for tablet/desktop */}

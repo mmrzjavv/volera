@@ -7,8 +7,8 @@ import { messageService } from '../services/api';
 import { MessageSquare, Bookmark, ShieldCheck, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { RecentChat } from '../types';
-import { getInitials } from '../utils/getInitials';
 import { StoriesStrip } from './StoriesStrip';
+import { ProfileAvatar } from './ProfileAvatar';
 
 const UNDO_DELAY_MS = 5000;
 
@@ -118,9 +118,9 @@ export const RecentChatList = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gray-100 dark:bg-gray-900 min-w-0">
-      <div className="p-3 sm:p-4 border-b border-gray-300 dark:border-gray-700 flex justify-between items-center bg-gray-100 dark:bg-gray-900 shrink-0">
-        <h2 className="font-bold text-base sm:text-lg text-gray-700 dark:text-gray-200 truncate">Chats</h2>
+    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--volera-bg)] min-w-0">
+      <div className="p-3 sm:p-4 border-b border-[var(--volera-border)] flex justify-between items-center bg-[var(--volera-surface)] shrink-0">
+        <h2 className="font-semibold text-base sm:text-lg text-[var(--volera-text)] truncate">Chats</h2>
       </div>
 
       <StoriesStrip />
@@ -130,7 +130,7 @@ export const RecentChatList = () => {
         <div
           onClick={() => selectSystemMessages()}
           className={clsx(
-            "group p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 active:bg-gray-100 dark:active:bg-gray-700 transition-colors flex items-center gap-3 relative min-h-[56px] touch-manipulation",
+            "group p-3 sm:p-4 border-b border-[var(--volera-border)] cursor-pointer hover:bg-[var(--volera-surface-muted)] active:bg-[var(--volera-surface-muted)] transition-colors flex items-center gap-3 relative min-h-[56px] touch-manipulation",
             showSystemMessages && "bg-[var(--volera-accent)]/10 border-l-4 border-l-[var(--volera-accent)]"
           )}
         >
@@ -139,16 +139,16 @@ export const RecentChatList = () => {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-baseline gap-2 mb-0.5">
-              <span className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">Application</span>
+              <span className="font-medium text-[var(--volera-text)] truncate text-sm sm:text-base">Application</span>
             </div>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">System announcements</p>
+            <p className="text-xs sm:text-sm text-[var(--volera-text-muted)] truncate">System announcements</p>
           </div>
         </div>
         {/* Saved Messages – always visible so it can be opened on mobile even when not in recent list */}
         <div
           onClick={() => selectSavedMessages()}
           className={clsx(
-            "group p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 active:bg-gray-100 dark:active:bg-gray-700 transition-colors flex items-center gap-3 relative min-h-[56px] touch-manipulation",
+            "group p-3 sm:p-4 border-b border-[var(--volera-border)] cursor-pointer hover:bg-[var(--volera-surface-muted)] active:bg-[var(--volera-surface-muted)] transition-colors flex items-center gap-3 relative min-h-[56px] touch-manipulation",
             showSavedMessages && "bg-[var(--volera-accent)]/10 border-l-4 border-l-[var(--volera-accent)]"
           )}
         >
@@ -157,18 +157,18 @@ export const RecentChatList = () => {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-baseline gap-2 mb-0.5">
-              <span className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">Saved Messages</span>
+              <span className="font-medium text-[var(--volera-text)] truncate text-sm sm:text-base">Saved Messages</span>
             </div>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">Notes and bookmarks</p>
+            <p className="text-xs sm:text-sm text-[var(--volera-text-muted)] truncate">Notes and bookmarks</p>
           </div>
         </div>
         {recentChats.length === 0 ? (
-             <div className="p-8 text-center text-gray-400 dark:text-gray-500 flex flex-col items-center justify-center h-full">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-                    <MessageSquare size={32} className="opacity-20 text-gray-600 dark:text-gray-400" />
+             <div className="p-8 text-center text-[var(--volera-text-muted)] flex flex-col items-center justify-center">
+                <div className="w-16 h-16 bg-[var(--volera-surface-muted)] rounded-full flex items-center justify-center mb-4">
+                    <MessageSquare size={32} className="opacity-40 text-[var(--volera-text-muted)]" />
                 </div>
-                <p className="font-medium text-gray-600 dark:text-gray-400">No recent chats</p>
-                <p className="text-sm mt-1 text-gray-500 dark:text-gray-400">Start a conversation from your Contacts list.</p>
+                <p className="font-medium text-[var(--volera-text)]">No conversations yet</p>
+                <p className="text-sm mt-1 max-w-[16rem]">Start a chat from Contacts, or open Saved Messages / Application above.</p>
             </div>
         ) : (
             recentChats
@@ -178,7 +178,7 @@ export const RecentChatList = () => {
                   key={chat.userId || chat.groupId}
                   onClick={() => handleChatClick(chat)}
                   className={clsx(
-                    "group p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 active:bg-gray-100 dark:active:bg-gray-700 transition-colors flex items-center gap-2 sm:gap-3 relative min-h-[56px] touch-manipulation",
+                    "group p-3 sm:p-4 border-b border-[var(--volera-border)] cursor-pointer hover:bg-[var(--volera-surface-muted)] active:bg-[var(--volera-surface-muted)] transition-colors flex items-center gap-2 sm:gap-3 relative min-h-[56px] touch-manipulation",
                     (selectedUser?.id === chat.userId || selectedGroup?.id === chat.groupId || (showSavedMessages && currentUser?.id === chat.userId)) && "bg-[var(--volera-accent)]/10 border-l-4 border-l-[var(--volera-accent)]"
                   )}
                 >
@@ -188,12 +188,12 @@ export const RecentChatList = () => {
                             <Bookmark size={20} className="sm:w-6 sm:h-6" />
                         </div>
                     ) : (
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-gray-600 dark:text-gray-400 overflow-hidden font-bold text-sm sm:text-lg">
-                             {chat.profilePicture ? (
-                                 <img src={chat.profilePicture} alt={getDisplayName(chat)} className="w-full h-full object-cover" />
-                             ) : (
-                                 getInitials(getDisplayName(chat))
-                             )}
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-[var(--volera-text-muted)] overflow-hidden font-bold text-sm sm:text-lg">
+                             <ProfileAvatar
+                               src={chat.profilePicture}
+                               name={getDisplayName(chat)}
+                               textClassName="text-sm sm:text-lg text-[var(--volera-text-muted)]"
+                             />
                         </div>
                     )}
                     {chat.isOnline && !chat.isGroup && currentUser?.id !== chat.userId && (
@@ -202,13 +202,13 @@ export const RecentChatList = () => {
                   </div>
                   <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-baseline gap-2 mb-0.5">
-                        <span className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">{currentUser?.id === chat.userId ? 'Saved Messages' : getDisplayName(chat)}</span>
+                        <span className="font-medium text-[var(--volera-text)] truncate text-sm sm:text-base">{currentUser?.id === chat.userId ? 'Saved Messages' : getDisplayName(chat)}</span>
                         <span className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 shrink-0 whitespace-nowrap">{formatTime(chat.lastMessageAt)}</span>
                     </div>
                     <div className="flex items-center gap-2 min-w-0">
                         <p className={clsx(
                             "text-xs sm:text-sm truncate min-w-0",
-                            chat.unreadCount > 0 ? "font-semibold text-gray-800 dark:text-gray-200" : "text-gray-500 dark:text-gray-400"
+                            chat.unreadCount > 0 ? "font-semibold text-[var(--volera-text)]" : "text-[var(--volera-text-muted)]"
                         )}>
                             {chat.lastMessageContent}
                         </p>

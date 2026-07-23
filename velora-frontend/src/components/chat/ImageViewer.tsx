@@ -107,13 +107,13 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[60] flex flex-col bg-black/95 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[60] flex flex-col bg-black/95 backdrop-blur-sm animate-in fade-in duration-200 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]"
       role="dialog"
       aria-modal="true"
       aria-label="Image viewer"
     >
       {/* Top bar: close + actions */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 sm:p-4 gap-2 min-h-[56px] safe-area-inset-top bg-gradient-to-b from-black/60 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 sm:p-4 gap-2 min-h-[56px] pt-[max(0.75rem,env(safe-area-inset-top,0px))] bg-gradient-to-b from-black/60 to-transparent">
         <button
           type="button"
           onClick={onClose}

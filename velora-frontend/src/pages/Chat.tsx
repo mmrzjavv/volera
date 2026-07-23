@@ -8,7 +8,6 @@ import axios from 'axios';
 import { userService, messageService, fileService, groupService, systemMessageService } from '../services/api';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { LogOut, Send, User as UserIcon, ArrowLeft, Phone, X, Users, MessageSquare, Paperclip, MessageCircle, Mic, Trash2, Video, Bookmark, Info, ShieldCheck, Loader2, CornerDownRight, ChevronRight, Bell, Shield, Moon } from 'lucide-react';
-import { getInitials } from '../utils/getInitials';
 import type { SystemMessage, Message, User, Group } from '../types';
 import { clsx } from 'clsx';
 import { CallModal } from '../components/CallModal';
@@ -24,13 +23,16 @@ import { useConfirmationStore } from '../store/useConfirmationStore';
 import { useToastStore } from '../store/useToastStore';
 import { useFileTransferStore } from '../store/useFileTransferStore';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { NetworkStatusIndicator } from '../components/NetworkStatusIndicator';
 import { FileTransferLoader } from '../components/ui/FileTransferLoader';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { GroupInfoModal } from '../components/GroupInfoModal';
+import { Modal } from '../components/ui/Modal';
 import { ImageViewer } from '../components/chat/ImageViewer';
 import { getCachedImageBlobUrl } from '../utils/imageCache';
 import { Profile } from './Profile';
+import { ProfileAvatar } from '../components/ProfileAvatar';
 import { splitMessage } from '../utils/messageSplitter';
 import { requestCallMedia } from '../utils/mediaPermissions';
 
@@ -54,27 +56,29 @@ function SystemMessagesChannelContent({ onMarkRead }: { onMarkRead: (id: string)
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">Loading...</div>
+      <div className="flex justify-center items-center h-full text-[var(--volera-text-muted)]">Loading…</div>
     );
   }
   if (list.length === 0) {
     return (
-      <div className="flex justify-center items-center h-full text-gray-400 dark:text-gray-500">No active system messages.</div>
+      <div className="volera-empty text-[var(--volera-text-muted)]">
+        <p>No active system messages.</p>
+      </div>
     );
   }
   return (
     <div className="space-y-4">
       {list.map((m) => (
           <div key={m.id} className="flex flex-col items-start gap-1">
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium text-gray-800 dark:text-gray-200">Application</span>
+            <div className="flex items-center gap-2 text-sm text-[var(--volera-text-muted)]">
+              <span className="font-medium text-[var(--volera-text)]">Application</span>
               <span title="Verified"><ShieldCheck size={14} className="text-emerald-500 dark:text-emerald-400 shrink-0" /></span>
             </div>
-            <div className="rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 shadow-sm">
+            <div className="rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] bg-[var(--volera-surface)] border border-[var(--volera-border)] text-[var(--volera-text)] shadow-sm">
               {m.title && <p className="font-semibold text-sm mb-1">{m.title}</p>}
               <p className="text-sm whitespace-pre-wrap break-words">{m.content}</p>
               {m.expiresAt && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Expires: {new Date(m.expiresAt).toLocaleString()}</p>
+                <p className="text-xs text-[var(--volera-text-muted)] mt-2">Expires: {new Date(m.expiresAt).toLocaleString()}</p>
               )}
             </div>
           </div>
@@ -88,6 +92,7 @@ export function Chat() {
   const { openDialog } = useConfirmationStore();
   const { addToast } = useToastStore();
   const isOnline = useOnlineStatus();
+  const isMobile = useIsMobile();
   const { user, logout } = useAuthStore();
   const { initializeCallConnection, initiateCall, initiateGroupCall } = useCallStore();
   const { 
@@ -95,7 +100,6 @@ export function Chat() {
     selectedGroup, 
     users,
     groups,
-    channels,
     recentChats,
     messages, 
     initializeConnection, 
@@ -124,11 +128,10 @@ export function Chat() {
   const [messageLengthLimit, setMessageLengthLimit] = useState<number>(2000); // Default to 2000
   const [activeTab, setActiveTab] = useState<'chats' | 'contacts' | 'groups' | 'calls' | 'profile'>('chats');
   const [profileSection, setProfileSection] = useState<'profile' | 'appearance' | 'notifications' | 'security'>('profile');
+  const [profileMobileDetail, setProfileMobileDetail] = useState(false);
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [isCreateChannelModalOpen, setIsCreateChannelModalOpen] = useState(false);
   const [isChannelInfoOpen, setIsChannelInfoOpen] = useState(false);
-  const [sendAsChannelId, setSendAsChannelId] = useState('');
-  const [sendAsOptions, setSendAsOptions] = useState<Group[]>([]);
   const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
   const [viewedImageMessage, setViewedImageMessage] = useState<Message | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -153,10 +156,6 @@ export function Chat() {
       .then(() => setActiveTab('groups'))
       .finally(() => navigate('.', { state: {}, replace: true }));
   }, [openGroupId]);
-
-  useEffect(() => {
-    setSendAsOptions(channels.filter((c) => c.isPublic && c.canPost));
-  }, [channels]);
 
   const getSupportedMimeType = () => {
       const types = [
@@ -347,7 +346,7 @@ export function Chat() {
         for (let i = 0; i < messageChunks.length; i++) {
           const chunk = messageChunks[i];
           const replyToId = i === 0 ? replyingTo?.id : undefined;
-          await sendMessage(chunk, undefined, undefined, replyToId, sendAsChannelId || undefined);
+          await sendMessage(chunk, undefined, undefined, replyToId);
           
           // Small delay between messages to ensure proper ordering
           if (i < messageChunks.length - 1) {
@@ -799,31 +798,38 @@ export function Chat() {
     )}>
       {/* Sidebar - User List */}
       <div className={clsx(
-        "w-full md:w-80 flex-shrink-0 bg-gray-100 dark:bg-gray-900 border-r border-gray-300 dark:border-gray-700 flex flex-col min-w-0 max-w-full min-h-0",
-        (selectedUser || selectedGroup || showSavedMessages || showSystemMessages) && activeTab !== 'profile' && activeTab !== 'calls' ? "hidden md:flex" : "flex",
-        activeTab === 'profile' ? "max-h-[45vh] md:max-h-none overflow-hidden" : "overflow-hidden"
+        "w-full md:w-80 lg:w-[22rem] flex-shrink-0 volera-sidebar border-r border-[var(--volera-border)] flex flex-col min-w-0 max-w-full min-h-0",
+        (() => {
+          const hideOnMobile =
+            (activeTab === 'profile' && profileMobileDetail) ||
+            ((selectedUser || selectedGroup || showSavedMessages || showSystemMessages) &&
+              activeTab !== 'profile' &&
+              activeTab !== 'calls');
+          return hideOnMobile ? "hidden md:flex" : "flex";
+        })(),
+        activeTab === 'profile' ? "md:max-h-none overflow-hidden" : "overflow-hidden"
       )}>
-        <div className="p-3 sm:p-4 border-b border-gray-300 dark:border-gray-700 flex items-center gap-2 sm:gap-3 bg-gray-100 dark:bg-gray-900 shrink-0">
+        <div className="p-3 sm:p-4 border-b border-[var(--volera-border)] flex items-center gap-2 sm:gap-3 bg-[var(--volera-surface)]/80 backdrop-blur-sm shrink-0">
           {/* Logo + app name */}
-          <div className="flex items-center gap-2 shrink-0 min-w-0">
-            <img src="/icon.svg" alt="Volera" className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg shrink-0" />
-            <span className="font-semibold text-gray-800 dark:text-gray-200 text-sm truncate hidden sm:block">Volera</span>
+          <div className="flex items-center gap-2.5 shrink-0 min-w-0">
+            <img src="/icon.svg" alt="Volera" className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shrink-0 shadow-sm" />
+            <span className="font-semibold text-[var(--volera-text)] text-base truncate hidden sm:block tracking-tight">Volera</span>
           </div>
           <div className="flex-1 min-w-0" />
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <NetworkStatusIndicator />
-            <button onClick={logout} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors touch-manipulation -mr-1" title="Logout" aria-label="Log out">
+            <button onClick={logout} className="volera-icon-btn hover:text-red-600 dark:hover:text-red-400 -mr-1" title="Logout" aria-label="Log out">
               <LogOut size={20} />
             </button>
           </div>
         </div>
         
-        <div className="flex border-b border-gray-300 dark:border-gray-700 shrink-0">
+        <div className="flex border-b border-[var(--volera-border)] shrink-0 bg-[var(--volera-surface)]/60">
           <button
-            onClick={() => setActiveTab('chats')}
+            onClick={() => { setActiveTab('chats'); setProfileMobileDetail(false); }}
             className={clsx(
               "flex-1 min-h-[48px] py-3 flex justify-center items-center border-b-2 transition-colors touch-manipulation",
-              activeTab === 'chats' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              activeTab === 'chats' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-[var(--volera-text-muted)] hover:text-[var(--volera-text)]"
             )}
             title="Chats"
             aria-label="Chats"
@@ -831,10 +837,10 @@ export function Chat() {
             <MessageCircle size={20} />
           </button>
           <button
-            onClick={() => setActiveTab('contacts')}
+            onClick={() => { setActiveTab('contacts'); setProfileMobileDetail(false); }}
             className={clsx(
               "flex-1 min-h-[48px] py-3 flex justify-center items-center border-b-2 transition-colors touch-manipulation",
-              activeTab === 'contacts' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              activeTab === 'contacts' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-[var(--volera-text-muted)] hover:text-[var(--volera-text)]"
             )}
             title="Contacts"
             aria-label="Contacts"
@@ -842,10 +848,10 @@ export function Chat() {
             <Users size={20} />
           </button>
           <button
-            onClick={() => setActiveTab('groups')}
+            onClick={() => { setActiveTab('groups'); setProfileMobileDetail(false); }}
             className={clsx(
               "flex-1 min-h-[48px] py-3 flex justify-center items-center border-b-2 transition-colors touch-manipulation",
-              activeTab === 'groups' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              activeTab === 'groups' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-[var(--volera-text-muted)] hover:text-[var(--volera-text)]"
             )}
             title="Groups"
             aria-label="Groups"
@@ -853,10 +859,10 @@ export function Chat() {
             <MessageSquare size={20} />
           </button>
           <button
-            onClick={() => setActiveTab('calls')}
+            onClick={() => { setActiveTab('calls'); setProfileMobileDetail(false); }}
             className={clsx(
               "flex-1 min-h-[48px] py-3 flex justify-center items-center border-b-2 transition-colors touch-manipulation",
-              activeTab === 'calls' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              activeTab === 'calls' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-[var(--volera-text-muted)] hover:text-[var(--volera-text)]"
             )}
             title="Calls"
             aria-label="Calls"
@@ -864,10 +870,10 @@ export function Chat() {
             <Phone size={20} />
           </button>
           <button
-            onClick={() => setActiveTab('profile')}
+            onClick={() => { setActiveTab('profile'); setProfileMobileDetail(false); }}
             className={clsx(
               "flex-1 min-h-[48px] py-3 flex justify-center items-center border-b-2 transition-colors touch-manipulation",
-              activeTab === 'profile' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              activeTab === 'profile' ? "border-[var(--volera-accent)] text-[var(--volera-accent)]" : "border-transparent text-[var(--volera-text-muted)] hover:text-[var(--volera-text)]"
             )}
             title="Profile"
             aria-label="Profile"
@@ -877,25 +883,23 @@ export function Chat() {
         </div>
 
         {activeTab === 'profile' ? (
-          <div className="flex-1 flex flex-col overflow-y-auto min-h-0 bg-gray-200 dark:bg-gray-950">
+          <div className="flex-1 flex flex-col overflow-y-auto min-h-0 bg-[var(--volera-bg)]">
             <div className="p-3 overflow-y-auto flex-1 min-h-0">
-              <div className="bg-gray-100 dark:bg-gray-900 rounded-xl overflow-hidden shadow-sm border border-gray-300 dark:border-gray-700">
-                <div className="p-4 flex items-center gap-4 border-b border-gray-300 dark:border-gray-700">
-                  <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex-shrink-0">
-                    {user?.profilePicture ? (
-                      <img src={user.profilePicture} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-xl font-semibold">
-                        {user?.firstName?.[0]}{user?.lastName?.[0]}
-                      </div>
-                    )}
+              <div className="volera-panel overflow-hidden">
+                <div className="p-4 flex items-center gap-4 border-b border-[var(--volera-border)]">
+                  <div className="w-14 h-14 rounded-full overflow-hidden bg-[var(--volera-surface-muted)] flex-shrink-0">
+                    <ProfileAvatar
+                      src={user?.profilePicture}
+                      name={`${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'User'}
+                      textClassName="text-xl font-semibold text-[var(--volera-text-muted)]"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-gray-900 dark:text-white truncate">{user?.firstName} {user?.lastName}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
+                    <h3 className="font-semibold text-[var(--volera-text)] truncate">{user?.firstName} {user?.lastName}</h3>
+                    <p className="text-sm text-[var(--volera-text-muted)] truncate">{user?.email}</p>
                   </div>
                 </div>
-                <div className="divide-y divide-gray-300 dark:divide-gray-700">
+                <div className="divide-y divide-[var(--volera-border)]">
                   {[
                     { id: 'profile' as const, label: 'Edit Profile', icon: UserIcon },
                     { id: 'appearance' as const, label: 'Appearance', icon: Moon },
@@ -904,22 +908,25 @@ export function Chat() {
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
-                      onClick={() => setProfileSection(id)}
+                      onClick={() => {
+                        setProfileSection(id);
+                        if (isMobile) setProfileMobileDetail(true);
+                      }}
                       className={clsx(
-                        "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
-                        profileSection === id ? "bg-[var(--volera-accent)]/10 text-[var(--volera-accent)]" : "text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:bg-gray-100 dark:active:bg-gray-700"
+                        "w-full flex items-center gap-3 px-4 py-3.5 min-h-[52px] text-left transition-colors touch-manipulation",
+                        profileSection === id && !isMobile ? "bg-[var(--volera-accent-soft)] text-[var(--volera-accent)]" : "text-[var(--volera-text)] hover:bg-[var(--volera-surface-muted)]/70 active:bg-[var(--volera-surface-muted)]"
                       )}
                     >
-                      <Icon size={20} className="flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                      <Icon size={20} className="flex-shrink-0 text-[var(--volera-text-muted)]" />
                       <span className="flex-1 font-medium">{label}</span>
-                      <ChevronRight size={18} className="text-gray-400 dark:text-gray-500" />
+                      <ChevronRight size={18} className="text-[var(--volera-text-muted)]" />
                     </button>
                   ))}
                 </div>
-                <div className="border-t border-gray-300 dark:border-gray-700">
+                <div className="border-t border-[var(--volera-border)]">
                   <button
                     onClick={logout}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 active:bg-red-100 dark:active:bg-red-900/30 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[52px] text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors touch-manipulation"
                   >
                     <LogOut size={20} className="flex-shrink-0" />
                     <span className="flex-1 font-medium">Log out</span>
@@ -944,13 +951,33 @@ export function Chat() {
 
       {/* Main Chat Area */}
       <div className={clsx(
-        "flex-1 flex flex-col min-w-0 min-h-0",
-        (!selectedUser && !selectedGroup && !showSavedMessages && !showSystemMessages && activeTab !== 'profile') ? "hidden md:flex" : "flex",
+        "flex-1 flex flex-col min-w-0 min-h-0 bg-[var(--volera-bg)]",
+        (() => {
+          if (activeTab === 'profile') {
+            return profileMobileDetail || !isMobile ? "flex" : "hidden md:flex";
+          }
+          const hasChat =
+            !!(selectedUser || selectedGroup || showSavedMessages || showSystemMessages);
+          return hasChat ? "flex" : "hidden md:flex";
+        })(),
         activeTab === 'profile' ? "md:min-h-0" : ""
       )}>
         <FileTransferLoader />
         {activeTab === 'profile' ? (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-gray-200 dark:bg-gray-950">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[var(--volera-bg)]">
+            {isMobile && profileMobileDetail && (
+              <div className="shrink-0 flex items-center gap-1 px-2 py-2 border-b border-[var(--volera-border)] bg-[var(--volera-surface)]">
+                <button
+                  type="button"
+                  onClick={() => setProfileMobileDetail(false)}
+                  className="volera-icon-btn"
+                  aria-label="Back to settings"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <span className="font-semibold text-[var(--volera-text)] capitalize">{profileSection === 'profile' ? 'Edit Profile' : profileSection}</span>
+              </div>
+            )}
             <Profile
               embedded
               activeSubTab={profileSection}
@@ -959,10 +986,10 @@ export function Chat() {
           </div>
         ) : (selectedUser || selectedGroup || showSavedMessages || showSystemMessages) ? (
           <>
-            <div className="p-3 sm:p-4 border-b border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 flex items-center gap-2 sm:gap-3 min-h-0 shadow-sm z-10">
+            <div className="p-2.5 sm:p-4 border-b border-[var(--volera-border)] bg-[var(--volera-surface)]/90 backdrop-blur-sm flex items-center gap-2 sm:gap-3 min-h-0 shadow-sm z-10 relative">
                <button 
                  onClick={clearSelection} 
-                 className="md:hidden p-2 -ml-2 shrink-0 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg"
+                 className="md:hidden volera-icon-btn -ml-1 shrink-0"
                  aria-label="Back"
                >
                  <ArrowLeft size={20} />
@@ -974,7 +1001,7 @@ export function Chat() {
                             <ShieldCheck size={20} className="shrink-0" />
                         </div>
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <h3 className="font-bold text-base sm:text-lg text-gray-800 dark:text-white truncate">Application</h3>
+                            <h3 className="font-semibold text-base sm:text-lg text-[var(--volera-text)] truncate">Application</h3>
                             <span title="Verified" className="shrink-0"><ShieldCheck size={18} className="text-emerald-500 dark:text-emerald-400" /></span>
                         </div>
                    </div>
@@ -984,61 +1011,61 @@ export function Chat() {
                             <Bookmark size={20} className="shrink-0" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-base sm:text-lg text-gray-800 dark:text-white truncate">Saved Messages</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate hidden sm:block">Cloud Storage</p>
+                            <h3 className="font-semibold text-base sm:text-lg text-[var(--volera-text)] truncate">Saved Messages</h3>
+                            <p className="text-xs text-[var(--volera-text-muted)] truncate hidden sm:block">Cloud Storage</p>
                         </div>
                    </div>
                ) : selectedUser ? (
                    <>
                        <div className="relative shrink-0">
-                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--volera-accent)]/15 flex items-center justify-center text-[var(--volera-accent)] overflow-hidden font-bold text-sm">
-                            {selectedUser.profilePicture ? (
-                              <img src={selectedUser.profilePicture} alt={getDisplayName(selectedUser)} className="w-full h-full object-cover" />
-                            ) : (
-                              getInitials(getDisplayName(selectedUser))
-                            )}
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--volera-accent-soft)] flex items-center justify-center text-[var(--volera-accent)] overflow-hidden font-bold text-sm">
+                            <ProfileAvatar
+                              src={selectedUser.profilePicture}
+                              name={getDisplayName(selectedUser)}
+                              textClassName="text-sm text-[var(--volera-accent)]"
+                            />
                           </div>
                           {selectedUser.isOnline && (
-                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></span>
+                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[var(--volera-surface)] rounded-full"></span>
                           )}
                        </div>
-                      <h3 className="font-bold text-base sm:text-lg text-gray-800 dark:text-white flex-1 min-w-0 truncate">{getDisplayName(selectedUser)}</h3>
+                      <h3 className="font-semibold text-base sm:text-lg text-[var(--volera-text)] flex-1 min-w-0 truncate">{getDisplayName(selectedUser)}</h3>
                       <button 
                         onClick={() => openUserProfile(selectedUser.id)}
-                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                        className="volera-icon-btn shrink-0"
                         title="View Profile"
                       >
-                        <Info size={22} />
+                        <Info size={20} />
                       </button>
                       <button 
                         onClick={() => initiateCall(selectedUser.id, getDisplayName(selectedUser), false, selectedUser.profilePicture ?? undefined)}
-                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 text-[var(--volera-accent)] hover:bg-[var(--volera-accent)]/10 dark:hover:bg-gray-700 rounded-full transition-colors"
+                        className="volera-icon-btn volera-icon-btn--accent shrink-0"
                         title="Start Voice Call"
                       >
-                        <Phone size={24} />
+                        <Phone size={20} />
                       </button>
                       <button 
                         onClick={() => initiateCall(selectedUser.id, getDisplayName(selectedUser), true, selectedUser.profilePicture ?? undefined)}
-                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 text-[var(--volera-accent)] hover:bg-[var(--volera-accent)]/10 dark:hover:bg-gray-700 rounded-full transition-colors"
+                        className="volera-icon-btn volera-icon-btn--accent shrink-0"
                         title="Start Video Call"
                       >
-                        <Video size={24} />
+                        <Video size={20} />
                       </button>
                    </>
                ) : (
                <>
-                       <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--volera-accent)]/15 dark:bg-gray-700 flex items-center justify-center text-[var(--volera-accent)] dark:text-gray-300 overflow-hidden shrink-0 font-bold text-sm">
-                           {selectedGroup?.profilePictureUrl ? (
-                               <img src={selectedGroup.profilePictureUrl} alt={selectedGroup.name} className="w-full h-full object-cover" />
-                           ) : (
-                               getInitials(selectedGroup?.name ?? '')
-                           )}
+                       <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--volera-accent-soft)] dark:bg-[var(--volera-surface-muted)] flex items-center justify-center text-[var(--volera-accent)] overflow-hidden shrink-0 font-bold text-sm">
+                           <ProfileAvatar
+                             src={selectedGroup?.profilePictureUrl}
+                             name={selectedGroup?.name ?? ''}
+                             textClassName="text-sm text-[var(--volera-accent)]"
+                           />
                        </div>
                        <div className="flex-1 min-w-0">
-                           <h3 className="font-bold text-base sm:text-lg text-gray-800 dark:text-white truncate">
+                           <h3 className="font-semibold text-base sm:text-lg text-[var(--volera-text)] truncate">
                              {selectedGroup?.name}
                              {selectedGroup?.isChannel ? (
-                               <span className="ml-2 text-xs font-normal text-gray-500">Channel</span>
+                               <span className="ml-2 text-xs font-normal text-[var(--volera-text-muted)]">Channel</span>
                              ) : null}
                            </h3>
                        </div>
@@ -1049,20 +1076,20 @@ export function Chat() {
                            if (!selectedGroup) return;
                            initiateGroupCall(selectedGroup.id, selectedGroup.name, false, selectedGroup.profilePictureUrl ?? undefined);
                          }}
-                         className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 text-[var(--volera-accent)] dark:text-gray-300 dark:hover:bg-gray-700 hover:bg-[var(--volera-accent)]/10 rounded-full transition-colors"
+                         className="volera-icon-btn volera-icon-btn--accent shrink-0"
                          title="Start Group Voice Call"
                        >
-                         <Phone size={24} />
+                         <Phone size={20} />
                        </button>
                        <button
                          onClick={() => {
                            if (!selectedGroup) return;
                            initiateGroupCall(selectedGroup.id, selectedGroup.name, true, selectedGroup.profilePictureUrl ?? undefined);
                          }}
-                         className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 text-[var(--volera-accent)] dark:text-gray-300 dark:hover:bg-gray-700 hover:bg-[var(--volera-accent)]/10 rounded-full transition-colors"
+                         className="volera-icon-btn volera-icon-btn--accent shrink-0"
                          title="Start Group Video Call"
                        >
-                         <Video size={24} />
+                         <Video size={20} />
                        </button>
                        </>
                        )}
@@ -1076,10 +1103,10 @@ export function Chat() {
                              loadGroupDetails(selectedGroup.id);
                            }
                          }}
-                         className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                         className="volera-icon-btn shrink-0"
                          title={selectedGroup?.isChannel ? 'Channel info' : 'Group info'}
                        >
-                         <Info size={22} />
+                         <Info size={20} />
                        </button>
                    </>
                )}
@@ -1096,31 +1123,31 @@ export function Chat() {
               <>
               {/* Selection action bar (FORWARD N, DELETE N, CANCEL) */}
               {selectionMode && (
-                  <div className="sticky top-0 z-10 mb-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[var(--volera-accent)] text-white shadow-lg">
-                      <div className="flex items-center gap-2">
+                  <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-[var(--volera-accent)] text-white shadow-lg">
+                      <div className="flex flex-wrap items-center gap-2">
                           <button
                               type="button"
                               onClick={forwardSelectedMessages}
                               disabled={selectedMessageIds.size === 0}
-                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 font-medium text-sm disabled:opacity-50 disabled:pointer-events-none"
+                              className="flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-lg bg-white/20 hover:bg-white/30 font-medium text-sm disabled:opacity-50 disabled:pointer-events-none touch-manipulation"
                           >
                               <CornerDownRight size={18} />
-                              Forward {selectedMessageIds.size}
+                              <span className="hidden xs:inline sm:inline">Forward</span> {selectedMessageIds.size}
                           </button>
                           <button
                               type="button"
                               onClick={deleteSelectedMessages}
                               disabled={selectedMessageIds.size === 0}
-                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-red-500/80 font-medium text-sm disabled:opacity-50 disabled:pointer-events-none"
+                              className="flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-lg bg-white/20 hover:bg-red-500/80 font-medium text-sm disabled:opacity-50 disabled:pointer-events-none touch-manipulation"
                           >
                               <Trash2 size={18} />
-                              Delete {selectedMessageIds.size}
+                              <span className="hidden sm:inline">Delete</span> {selectedMessageIds.size}
                           </button>
                       </div>
                       <button
                           type="button"
                           onClick={exitSelectionMode}
-                          className="px-4 py-2 text-sm font-medium hover:bg-white/20 rounded-lg"
+                          className="px-3 py-2 min-h-[40px] text-sm font-medium hover:bg-white/20 rounded-lg touch-manipulation"
                       >
                           Cancel
                       </button>
@@ -1142,36 +1169,36 @@ export function Chat() {
 
                   return (
                       <div className="sticky top-0 z-10 mb-3">
-                          <div className="rounded-2xl bg-white/95 border border-gray-200 shadow-sm px-3 py-2 flex flex-col gap-1 backdrop-blur">
+                          <div className="rounded-2xl bg-[var(--volera-surface)]/95 border border-[var(--volera-border)] shadow-sm px-3 py-2 flex flex-col gap-1 backdrop-blur">
                               <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-2 min-w-0">
-                                      <span className="text-sm">📌</span>
+                                      <span className="text-sm" aria-hidden>📌</span>
                                       <div className="min-w-0">
-                                          <div className="text-xs font-semibold text-gray-800 truncate">
+                                          <div className="text-xs font-semibold text-[var(--volera-text)] truncate">
                                               Pinned message
                                           </div>
                                           <button
                                               type="button"
                                               onClick={() => scrollToMessage(primary.id)}
-                                              className="text-xs text-gray-600 truncate hover:text-[var(--volera-accent)] transition-colors"
+                                              className="text-xs text-[var(--volera-text-muted)] truncate hover:text-[var(--volera-accent)] transition-colors max-w-full text-left"
                                               title={primary.content || '(attachment)'}
                                           >
                                               {primary.content || '(attachment)'}
                                           </button>
                                       </div>
                                   </div>
-                                  <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                  <span className="text-[10px] text-[var(--volera-text-muted)] whitespace-nowrap">
                                       {sortedPinned.length} pinned
                                   </span>
                               </div>
                               {rest.length > 0 && (
-                                  <div className="flex items-center gap-1 overflow-x-auto pt-1">
+                                  <div className="flex items-center gap-1 overflow-x-auto pt-1 message-input-scrollbar">
                                       {rest.map(m => (
                                           <button
                                               key={m.id}
                                               type="button"
                                               onClick={() => scrollToMessage(m.id)}
-                                              className="px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-700 hover:bg-[var(--volera-accent)]/10 hover:text-[var(--volera-accent-hover)] transition-colors whitespace-nowrap max-w-[150px] truncate"
+                                              className="px-2 py-1 rounded-full bg-[var(--volera-surface-muted)] text-[11px] text-[var(--volera-text)] hover:bg-[var(--volera-accent-soft)] hover:text-[var(--volera-accent)] transition-colors whitespace-nowrap max-w-[150px] truncate"
                                               title={m.content || '(attachment)'}
                                           >
                                               {m.content || '(attachment)'}
@@ -1189,9 +1216,12 @@ export function Chat() {
                   </div>
               )}
               {isLoadingMessages && (!messages || !Array.isArray(messages) || messages.length === 0) ? (
-                <div className="flex justify-center items-center h-full text-gray-500">Loading messages...</div>
+                <div className="flex justify-center items-center h-full text-[var(--volera-text-muted)]">Loading messages…</div>
               ) : (!messages || !Array.isArray(messages) || messages.length === 0) ? (
-                <div className="flex justify-center items-center h-full text-gray-400">No messages yet. Say hello!</div>
+                <div className="volera-empty text-[var(--volera-text-muted)]">
+                  <p className="font-medium text-[var(--volera-text)]">No messages yet</p>
+                  <p className="text-sm">Say hello to start the conversation.</p>
+                </div>
               ) : (
                 messages.map((msg) => {
                   const isMyMessage = msg.senderId === user?.id;
@@ -1244,51 +1274,34 @@ export function Chat() {
             </div>
 
             {!showSystemMessages && selectedGroup?.isChannel && selectedGroup.canPost === false ? (
-            <div className="p-3 sm:p-4 bg-gray-100 dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700 shrink-0 text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Only admins can post in this channel.</p>
+            <div className="p-3 sm:p-4 bg-[var(--volera-surface)] border-t border-[var(--volera-border)] shrink-0 text-center volera-composer">
+              <p className="text-sm text-[var(--volera-text-muted)]">Only admins can post in this channel.</p>
             </div>
             ) : !showSystemMessages && (
-            <div className="p-2 sm:p-4 bg-gray-100 dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700 shrink-0">
+            <div className="p-2 sm:p-4 bg-[var(--volera-surface)] border-t border-[var(--volera-border)] shrink-0 volera-composer">
               {editingMessage && (
-                  <div className="flex justify-between items-center mb-2 px-4 py-2 bg-[var(--volera-accent)]/10 rounded-lg border border-[var(--volera-accent)]/20">
-                      <div className="flex flex-col">
+                  <div className="flex justify-between items-center mb-2 px-3 py-2 bg-[var(--volera-accent-soft)] rounded-lg border border-[var(--volera-accent)]/20">
+                      <div className="flex flex-col min-w-0 flex-1">
                           <span className="text-xs font-semibold text-[var(--volera-accent)]">Editing message</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">{editingMessage.content}</span>
+                          <span className="text-xs text-[var(--volera-text-muted)] truncate max-w-[min(100%,16rem)]">{editingMessage.content}</span>
                       </div>
-                      <button onClick={cancelEditing} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                          <X size={16} />
+                      <button type="button" onClick={cancelEditing} className="volera-icon-btn shrink-0" aria-label="Cancel editing">
+                          <X size={18} />
                       </button>
                   </div>
               )}
               {!editingMessage && replyingTo && (
-                  <div className="flex justify-between items-center mb-2 px-4 py-2 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-100 dark:border-green-800">
-                      <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-green-700 dark:text-green-400">Replying to</span>
-                          <span className="text-xs text-gray-600 dark:text-gray-300 truncate max-w-[220px]">
+                  <div className="flex justify-between items-center mb-2 px-3 py-2 bg-[var(--volera-accent-soft)] rounded-lg border border-[var(--volera-accent)]/20">
+                      <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-xs font-semibold text-[var(--volera-accent)]">Replying to</span>
+                          <span className="text-xs text-[var(--volera-text-muted)] truncate max-w-[min(100%,16rem)]">
                               {replyingTo.content}
                           </span>
                       </div>
-                      <button onClick={() => setReplyingTo(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                          <X size={16} />
+                      <button type="button" onClick={() => setReplyingTo(null)} className="volera-icon-btn shrink-0" aria-label="Cancel reply">
+                          <X size={18} />
                       </button>
                   </div>
-              )}
-              {sendAsOptions.length > 0 && !selectedGroup?.isChannel && (
-                <div className="mb-2 px-1">
-                  <label className="text-xs text-gray-500 dark:text-gray-400 mr-2">Send as</label>
-                  <select
-                    value={sendAsChannelId}
-                    onChange={(e) => setSendAsChannelId(e.target.value)}
-                    className="text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-2 py-1"
-                  >
-                    <option value="">Myself</option>
-                    {sendAsOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}{c.publicUsername ? ` (@${c.publicUsername})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               )}
               <form onSubmit={handleSendMessage} className="min-w-0">
                 <input
@@ -1302,13 +1315,13 @@ export function Chat() {
                 {isRecording ? (
                     <div className="flex-1 flex items-center gap-4 px-4 py-3 bg-red-50 dark:bg-red-900/30 rounded-full border border-red-100 dark:border-red-800 animate-pulse">
                         <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)}</span>
-                        <span className="flex-1 text-center text-gray-400 dark:text-gray-500 text-sm hidden md:block">Release to send, slide out to cancel</span>
-                         <span className="flex-1 text-center text-gray-400 dark:text-gray-500 text-sm md:hidden">Recording...</span>
+                        <span className="text-red-600 dark:text-red-400 font-medium tabular-nums">{formatDuration(recordingDuration)}</span>
+                        <span className="flex-1 text-center text-[var(--volera-text-muted)] text-sm hidden md:block">Release to send, slide out to cancel</span>
+                         <span className="flex-1 text-center text-[var(--volera-text-muted)] text-sm md:hidden">Recording…</span>
                         <button 
                             type="button" 
                             onClick={cancelRecording}
-                            className="p-2 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-800/50 rounded-full transition-colors z-20"
+                            className="volera-icon-btn text-red-500 dark:text-red-400 z-20"
                             title="Cancel recording"
                         >
                             <Trash2 size={20} />
@@ -1319,7 +1332,7 @@ export function Chat() {
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="shrink-0 p-2.5 sm:p-3 text-gray-500 dark:text-gray-400 hover:text-[var(--volera-accent)] dark:hover:text-gray-200 hover:bg-[var(--volera-accent)]/10 dark:hover:bg-gray-700 rounded-full transition-colors"
+                            className="volera-icon-btn shrink-0"
                             disabled={isUploading}
                             title="Attach file"
                         >
@@ -1339,7 +1352,7 @@ export function Chat() {
                             onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', behavior: 'smooth' })}
                             placeholder={editingMessage ? "Edit your message..." : "Type a message..."}
                             rows={1}
-                            className="message-input-scrollbar flex-1 min-w-0 w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-2xl text-gray-900 dark:text-gray-100 placeholder:text-gray-500 placeholder:dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--volera-accent)] dark:focus:ring-gray-500 focus:border-transparent transition-[box-shadow,border-color,background-color] text-base scroll-mb-4 resize-none overflow-y-hidden min-h-[44px] max-h-[min(30vh,8.5rem)] sm:max-h-[min(35vh,12.5rem)] leading-relaxed"
+                            className="message-input-scrollbar flex-1 min-w-0 w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-[var(--volera-surface-muted)] border border-[var(--volera-border)] rounded-2xl text-[var(--volera-text)] placeholder:text-[var(--volera-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--volera-accent)] focus:border-transparent transition-[box-shadow,border-color,background-color] text-base scroll-mb-4 resize-none overflow-y-hidden min-h-[44px] max-h-[min(30vh,8.5rem)] sm:max-h-[min(35vh,12.5rem)] leading-relaxed"
                           />
                     </>
                 )}
@@ -1352,7 +1365,7 @@ export function Chat() {
                         onMouseLeave={typeof window !== 'undefined' && 'ontouchstart' in window ? undefined : (isRecording ? cancelRecording : undefined)}
                         onTouchStart={startRecording}
                         onTouchEnd={stopRecording}
-                        className="shrink-0 p-2.5 sm:p-3 bg-[var(--volera-accent)] dark:bg-gray-600 text-white rounded-full hover:bg-[var(--volera-accent-hover)] dark:hover:bg-gray-500 transition-colors shadow-sm cursor-pointer select-none touch-none"
+                        className="shrink-0 p-2.5 sm:p-3 min-w-[44px] min-h-[44px] flex items-center justify-center bg-[var(--volera-accent)] text-white rounded-full hover:bg-[var(--volera-accent-hover)] transition-colors shadow-sm cursor-pointer select-none touch-none"
                         title="Hold to record"
                     >
                         <Mic size={20} />
@@ -1365,9 +1378,8 @@ export function Chat() {
                           "shrink-0 p-2.5 sm:p-3 rounded-full transition-colors shadow-sm flex items-center justify-center min-w-[44px] min-h-[44px]",
                           isRecording 
                             ? "bg-red-500 text-white hover:bg-red-600 dark:bg-red-900/70 dark:hover:bg-red-800 animate-pulse" 
-                            : "bg-[var(--volera-accent)] dark:bg-gray-600 text-white hover:bg-[var(--volera-accent-hover)] dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            : "bg-[var(--volera-accent)] text-white hover:bg-[var(--volera-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
                       )}
-                      // If recording, clicking this acts as manual send (though release usually handles it)
                       onClick={isRecording ? stopRecording : undefined}
                     >
                       {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
@@ -1375,7 +1387,7 @@ export function Chat() {
                 )}
                 </div>
                 {!isRecording && (
-                  <div className="text-xs text-right text-gray-500 dark:text-gray-400 pr-12 sm:pr-14 h-4 mt-0.5">
+                  <div className="text-xs text-right text-[var(--volera-text-muted)] pr-12 sm:pr-14 h-4 mt-0.5">
                     {messageInput.length > 0 && `${messageInput.length} / ${messageLengthLimit}`}
                   </div>
                 )}
@@ -1516,35 +1528,38 @@ export function Chat() {
         isLoadingDetails={isGroupDetailsLoading}
       />
       {forwardingMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-              <h3 className="font-semibold text-gray-800 dark:text-white text-sm">
-                {forwardingMessages.length > 1 ? `Forward ${forwardingMessages.length} messages` : 'Forward message'}
-              </h3>
-              <button
-                onClick={() => { if (!forwardingTo) { setForwardingMessage(null); setForwardingMessages([]); } }}
-                disabled={!!forwardingTo}
-                className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                {forwardingMessages.length > 1 ? 'Messages:' : 'Message:'}
-              </p>
-              <p className="text-sm text-gray-800 dark:text-gray-200 line-clamp-3">
-                {forwardingMessages.length > 1
-                  ? `${forwardingMessages.length} message(s) selected`
-                  : forwardingMessage.content}
-              </p>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">
+        <Modal
+          isOpen
+          tallOnMobile
+          closeDisabled={!!forwardingTo}
+          onClose={() => {
+            if (!forwardingTo) {
+              setForwardingMessage(null);
+              setForwardingMessages([]);
+            }
+          }}
+          title={
+            forwardingMessages.length > 1
+              ? `Forward ${forwardingMessages.length} messages`
+              : 'Forward message'
+          }
+        >
+          <div className="px-4 py-3 border-b border-[var(--volera-border)]">
+            <p className="text-xs text-[var(--volera-text-muted)] mb-1">
+              {forwardingMessages.length > 1 ? 'Messages:' : 'Message:'}
+            </p>
+            <p className="text-sm text-[var(--volera-text)] line-clamp-3 break-words">
+              {forwardingMessages.length > 1
+                ? `${forwardingMessages.length} message(s) selected`
+                : forwardingMessage.content}
+            </p>
+          </div>
+          <div className="px-4 py-3 space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-[var(--volera-text-muted)] mb-2 uppercase tracking-wide">
                 Forward to user
               </p>
-              <div className="space-y-1 mb-4">
+              <div className="space-y-1">
                 {recentChats
                   .filter((rc) => rc.userId && !rc.isGroup && rc.userId !== user?.id)
                   .map((rc) => {
@@ -1553,17 +1568,30 @@ export function Chat() {
                     return (
                       <button
                         key={rc.userId}
+                        type="button"
                         onClick={() => forwardToUser(rc.userId!)}
                         disabled={!!forwardingTo}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-left text-sm disabled:opacity-50 disabled:pointer-events-none"
+                        className="w-full flex items-center justify-between px-3 py-2.5 min-h-[48px] rounded-lg border border-[var(--volera-border)] hover:bg-[var(--volera-surface-muted)] text-left text-sm disabled:opacity-50 disabled:pointer-events-none touch-manipulation"
                       >
-                        <span className="truncate text-gray-800 dark:text-gray-200">{getDisplayName({ id: rc.userId!, firstName: rc.firstName, lastName: rc.lastName, username: rc.username })}</span>
+                        <span className="truncate text-[var(--volera-text)]">
+                          {getDisplayName({
+                            id: rc.userId!,
+                            firstName: rc.firstName,
+                            lastName: rc.lastName,
+                            username: rc.username,
+                          })}
+                        </span>
                         {isForwarding && <Loader2 size={16} className="animate-spin shrink-0 ml-2" />}
                       </button>
                     );
                   })}
+                {recentChats.filter((rc) => rc.userId && !rc.isGroup && rc.userId !== user?.id).length === 0 && (
+                  <p className="text-sm text-[var(--volera-text-muted)] py-2">No recent users</p>
+                )}
               </div>
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--volera-text-muted)] mb-2 uppercase tracking-wide">
                 Forward to group
               </p>
               <div className="space-y-1">
@@ -1573,19 +1601,23 @@ export function Chat() {
                   return (
                     <button
                       key={g.id}
+                      type="button"
                       onClick={() => forwardToGroup(g.id)}
                       disabled={!!forwardingTo}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-left text-sm disabled:opacity-50 disabled:pointer-events-none"
+                      className="w-full flex items-center justify-between px-3 py-2.5 min-h-[48px] rounded-lg border border-[var(--volera-border)] hover:bg-[var(--volera-surface-muted)] text-left text-sm disabled:opacity-50 disabled:pointer-events-none touch-manipulation"
                     >
-                      <span className="truncate text-gray-800 dark:text-gray-200">{g.name}</span>
+                      <span className="truncate text-[var(--volera-text)]">{g.name}</span>
                       {isForwarding && <Loader2 size={16} className="animate-spin shrink-0 ml-2" />}
                     </button>
                   );
                 })}
+                {groups.length === 0 && (
+                  <p className="text-sm text-[var(--volera-text-muted)] py-2">No groups</p>
+                )}
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
       {isCreateGroupModalOpen && (
         <CreateGroupModal
@@ -1608,6 +1640,14 @@ export function Chat() {
           channelId={selectedGroup.id}
           isOpen={isChannelInfoOpen}
           onClose={() => setIsChannelInfoOpen(false)}
+          onProfileUpdated={(updates) => {
+            updateSelectedGroup({
+              name: updates.name,
+              profilePictureUrl: updates.profilePictureUrl,
+            });
+            fetchChannels();
+            fetchRecentChats();
+          }}
         />
       )}
       <AddContactModal isOpen={isAddContactModalOpen} onClose={() => setIsAddContactModalOpen(false)} />

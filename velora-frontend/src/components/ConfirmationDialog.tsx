@@ -91,7 +91,7 @@ export const ConfirmationDialog: React.FC = () => {
 
   return createPortal(
     <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm pt-[env(safe-area-inset-top,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] pb-[env(safe-area-inset-bottom,0px)] sm:p-4"
       ref={overlayRef}
       onClick={handleOverlayClick}
       role="dialog"
@@ -99,9 +99,12 @@ export const ConfirmationDialog: React.FC = () => {
       aria-labelledby="dialog-title"
       aria-describedby="dialog-description"
     >
-      <div className="w-full max-w-md max-h-[90vh] flex flex-col bg-[var(--volera-surface)] rounded-[var(--volera-radius-md)] shadow-2xl transform transition-all animate-in zoom-in-95 duration-200 border border-[var(--volera-border)] overflow-hidden">
-        <div className="p-6 overflow-y-auto overflow-x-hidden min-h-0 flex-1">
-            <div className="flex items-start gap-4 min-w-0">
+      <div className="w-full max-w-md max-h-[min(92dvh,100%)] sm:max-h-[90vh] flex flex-col bg-[var(--volera-surface)] rounded-t-[var(--volera-radius-lg)] sm:rounded-[var(--volera-radius-md)] shadow-2xl border border-[var(--volera-border)] overflow-hidden volera-fade-up">
+        <div className="sm:hidden flex justify-center pt-2 shrink-0" aria-hidden>
+          <div className="w-10 h-1 rounded-full bg-[var(--volera-border)]" />
+        </div>
+        <div className="p-5 sm:p-6 overflow-y-auto overflow-x-hidden min-h-0 flex-1 overscroll-contain">
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                 <div className={clsx("p-3 rounded-full flex-shrink-0", getVariantStyles())}>
                     {getIcon()}
                 </div>
@@ -118,7 +121,7 @@ export const ConfirmationDialog: React.FC = () => {
             </div>
         </div>
 
-        <div className="bg-[var(--volera-surface-muted)] px-6 py-4 flex flex-row-reverse gap-3 border-t border-[var(--volera-border)] shrink-0">
+        <div className="bg-[var(--volera-surface-muted)] px-4 sm:px-6 py-4 flex flex-col-reverse sm:flex-row-reverse gap-3 border-t border-[var(--volera-border)] shrink-0 pb-[max(1rem,env(safe-area-inset-bottom,0px))] sm:pb-4">
           <Button
             variant={variant === 'danger' ? 'danger' : 'primary'}
             onClick={handleConfirm}
@@ -133,6 +136,7 @@ export const ConfirmationDialog: React.FC = () => {
             variant="secondary"
             onClick={handleCancel}
             ref={cancelButtonRef}
+            disabled={isConfirming}
             className="w-full sm:w-auto"
           >
             {cancelText}

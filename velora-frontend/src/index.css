@@ -14,39 +14,103 @@
 @custom-variant dark (&&:where(.dark, .dark *));
 
 /*
-  Volera design tokens — original teal/slate system (not Telegram branding).
+  Remap cool blue-gray / slate → Volera teal-green neutrals.
+  Leftover `bg-gray-*` / `dark:bg-gray-*` no longer look navy.
+*/
+@theme {
+  --font-sans:
+    "Vazirmatn", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono: var(--font-sans);
+
+  --color-gray-50: #f2f6f5;
+  --color-gray-100: #e7eeeb;
+  --color-gray-200: #d5e0db;
+  --color-gray-300: #b8c9c2;
+  --color-gray-400: #8fa39b;
+  --color-gray-500: #5a6b66;
+  --color-gray-600: #455550;
+  --color-gray-700: #2a3a36;
+  --color-gray-800: #1a2623;
+  --color-gray-900: #121c1a;
+  --color-gray-950: #0a1210;
+
+  --color-slate-50: #f2f6f5;
+  --color-slate-100: #e7eeeb;
+  --color-slate-200: #d5e0db;
+  --color-slate-300: #b8c9c2;
+  --color-slate-400: #8fa39b;
+  --color-slate-500: #5a6b66;
+  --color-slate-600: #455550;
+  --color-slate-700: #2a3a36;
+  --color-slate-800: #1a2623;
+  --color-slate-900: #121c1a;
+  --color-slate-950: #0a1210;
+
+  --color-zinc-50: #f2f6f5;
+  --color-zinc-100: #e7eeeb;
+  --color-zinc-200: #d5e0db;
+  --color-zinc-300: #b8c9c2;
+  --color-zinc-400: #8fa39b;
+  --color-zinc-500: #5a6b66;
+  --color-zinc-600: #455550;
+  --color-zinc-700: #2a3a36;
+  --color-zinc-800: #1a2623;
+  --color-zinc-900: #121c1a;
+  --color-zinc-950: #0a1210;
+
+  --color-neutral-50: #f2f6f5;
+  --color-neutral-100: #e7eeeb;
+  --color-neutral-200: #d5e0db;
+  --color-neutral-300: #b8c9c2;
+  --color-neutral-400: #8fa39b;
+  --color-neutral-500: #5a6b66;
+  --color-neutral-600: #455550;
+  --color-neutral-700: #2a3a36;
+  --color-neutral-800: #1a2623;
+  --color-neutral-900: #121c1a;
+  --color-neutral-950: #0a1210;
+}
+
+/*
+  Volera design tokens — teal/green system.
 */
 :root {
-  --volera-bg: #f4f7f6;
+  --volera-bg: #f2f6f5;
   --volera-surface: #ffffff;
-  --volera-surface-muted: #e8efec;
-  --volera-border: #d5e0db;
-  --volera-text: #0f1c1a;
+  --volera-surface-muted: #e7eeeb;
+  --volera-border: #d0ddd7;
+  --volera-text: #0c1917;
   --volera-text-muted: #5a6b66;
   --volera-accent: #0f766e;
   --volera-accent-hover: #0d9488;
+  --volera-accent-soft: rgb(15 118 110 / 0.12);
   --volera-danger: #b91c1c;
-  --volera-radius-sm: 0.5rem;
-  --volera-radius-md: 0.875rem;
-  --volera-radius-lg: 1.25rem;
+  --volera-radius-sm: 0.625rem;
+  --volera-radius-md: 1rem;
+  --volera-radius-lg: 1.35rem;
   --volera-space-1: 0.25rem;
   --volera-space-2: 0.5rem;
   --volera-space-3: 0.75rem;
   --volera-space-4: 1rem;
-  --volera-shadow: 0 1px 2px rgb(15 28 26 / 0.06);
-  --volera-motion: 160ms ease;
+  --volera-shadow: 0 1px 2px rgb(15 28 26 / 0.05), 0 8px 24px rgb(15 28 26 / 0.04);
+  --volera-shadow-lg: 0 12px 40px rgb(15 28 26 / 0.12);
+  --volera-motion: 180ms cubic-bezier(0.22, 1, 0.36, 1);
   --volera-z-nav: 40;
   --volera-z-modal: 50;
+  --volera-z-banner: 99;
   --volera-focus: 0 0 0 3px rgb(15 118 110 / 0.35);
+  --install-banner-offset: 0px;
+  --banner-stack-top: env(safe-area-inset-top, 0px);
 
   --chat-bubble-me: #0f766e;
   --chat-bubble-other: #ffffff;
-  --chat-bubble-other-border: #d5e0db;
+  --chat-bubble-other-border: #d0ddd7;
   --chat-bg: transparent;
 }
 
 .dark {
-  --volera-bg: #0b1412;
+  --volera-bg: #0a1210;
   --volera-surface: #121c1a;
   --volera-surface-muted: #1a2623;
   --volera-border: #2a3a36;
@@ -54,8 +118,10 @@
   --volera-text-muted: #9bb0a9;
   --volera-accent: #2dd4bf;
   --volera-accent-hover: #5eead4;
+  --volera-accent-soft: rgb(45 212 191 / 0.14);
   --volera-danger: #f87171;
-  --volera-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+  --volera-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 8px 28px rgb(0 0 0 / 0.28);
+  --volera-shadow-lg: 0 16px 48px rgb(0 0 0 / 0.45);
   --volera-focus: 0 0 0 3px rgb(45 212 191 / 0.35);
 
   --chat-bubble-other: #1a2623;
@@ -77,10 +143,31 @@
 
 .volera-shell {
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgb(15 118 110 / 0.08), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgb(13 148 136 / 0.06), transparent 50%),
+    radial-gradient(1100px 520px at 8% -12%, rgb(15 118 110 / 0.1), transparent 55%),
+    radial-gradient(800px 420px at 100% 0%, rgb(13 148 136 / 0.07), transparent 50%),
     var(--volera-bg);
   color: var(--volera-text);
+}
+
+.volera-auth-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  background:
+    radial-gradient(900px 480px at 15% 0%, rgb(15 118 110 / 0.16), transparent 55%),
+    radial-gradient(700px 400px at 95% 10%, rgb(13 148 136 / 0.1), transparent 50%),
+    linear-gradient(165deg, #eef5f3 0%, var(--volera-bg) 45%, #e8f0ed 100%);
+  color: var(--volera-text);
+}
+
+.dark .volera-auth-shell {
+  background:
+    radial-gradient(900px 480px at 15% 0%, rgb(45 212 191 / 0.12), transparent 55%),
+    radial-gradient(700px 400px at 95% 10%, rgb(15 118 110 / 0.18), transparent 50%),
+    linear-gradient(165deg, #0a1210 0%, #0b1412 50%, #0e1a17 100%);
 }
 
 .volera-panel {
@@ -88,6 +175,11 @@
   border: 1px solid var(--volera-border);
   border-radius: var(--volera-radius-lg);
   box-shadow: var(--volera-shadow);
+}
+
+.volera-sidebar {
+  background: color-mix(in srgb, var(--volera-surface) 92%, var(--volera-surface-muted));
+  border-color: var(--volera-border);
 }
 
 .volera-empty {
@@ -112,22 +204,78 @@
   font-weight: 700;
   font-size: 1.5rem;
   letter-spacing: -0.04em;
+  box-shadow: var(--volera-shadow);
+}
+
+.volera-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem;
+  border-radius: 9999px;
+  color: var(--volera-text-muted);
+  transition: background-color var(--volera-motion), color var(--volera-motion), opacity var(--volera-motion);
+  touch-action: manipulation;
+}
+
+.volera-icon-btn:hover {
+  color: var(--volera-text);
+  background: var(--volera-accent-soft);
+}
+
+.volera-icon-btn--accent {
+  color: var(--volera-accent);
+}
+
+.volera-icon-btn--accent:hover {
+  color: var(--volera-accent-hover);
+  background: var(--volera-accent-soft);
+}
+
+.volera-list-row {
+  min-height: 56px;
+  touch-action: manipulation;
+}
+
+.volera-banner-stack {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--volera-z-banner);
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  pointer-events: none;
+}
+
+.volera-banner-stack > * {
+  pointer-events: auto;
 }
 
 .chat-messages-area {
-  background: var(--chat-bg, var(--volera-bg));
+  background: var(--chat-bg, transparent);
 }
+
 .dark .chat-messages-area {
   background: var(--chat-bg, #070f0d);
 }
 
 @media (min-width: 768px) {
   .chat-messages-area {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-    padding-top: 1.25rem;
-    padding-bottom: 1.25rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
   }
+}
+
+.volera-composer {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  margin-bottom: var(--install-banner-offset, 0px);
+  transition: margin-bottom var(--volera-motion);
 }
 
 /* Adaptive layout helpers */
@@ -151,11 +299,11 @@
 
 .message-input-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.6) transparent;
+  scrollbar-color: rgb(90 107 102 / 0.45) transparent;
   -webkit-overflow-scrolling: touch;
 }
 .dark .message-input-scrollbar {
-  scrollbar-color: rgba(75, 85, 99, 0.6) transparent;
+  scrollbar-color: rgb(155 176 169 / 0.35) transparent;
 }
 .message-input-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -165,17 +313,32 @@
   background: transparent;
 }
 .message-input-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.5);
+  background: rgb(90 107 102 / 0.4);
   border-radius: 3px;
 }
 .message-input-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.8);
+  background: rgb(90 107 102 / 0.65);
 }
 .dark .message-input-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.5);
+  background: rgb(155 176 169 / 0.35);
 }
 .dark .message-input-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(75, 85, 99, 0.8);
+  background: rgb(155 176 169 / 0.55);
+}
+
+@keyframes volera-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.volera-fade-up {
+  animation: volera-fade-up var(--volera-motion) both;
 }
 
 @layer base {
@@ -196,10 +359,27 @@
       sans-serif;
     background: var(--volera-bg);
     color: var(--volera-text);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   :focus-visible {
     outline: none;
     box-shadow: var(--volera-focus);
+  }
+
+  button,
+  a,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  table,
+  th,
+  td,
+  input,
+  textarea,
+  select {
+    font-family: inherit;
   }
 }

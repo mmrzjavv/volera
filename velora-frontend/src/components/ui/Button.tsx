@@ -29,7 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={twMerge(
-          'rounded-[var(--volera-radius-sm)] font-medium transition-[var(--volera-motion)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2',
+          'rounded-[var(--volera-radius-sm)] font-medium transition-all duration-[var(--volera-motion)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 touch-manipulation active:scale-[0.98]',
           variants[variant],
           sizes[size],
           className

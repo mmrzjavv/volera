@@ -1,5 +1,5 @@
-import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { WifiOff } from 'lucide-react';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export function OfflineBanner() {
   const isOnline = useOnlineStatus();
@@ -7,9 +7,9 @@ export function OfflineBanner() {
   if (isOnline) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[99] bg-amber-600 text-white px-4 py-2 flex items-center justify-center gap-2 shadow-md">
+    <div className="w-full bg-amber-600 text-white px-4 py-2.5 flex items-center justify-center gap-2 shadow-sm">
       <WifiOff size={18} className="shrink-0" />
-      <span className="text-sm font-medium">You're offline. Some features may not work.</span>
+      <span className="text-sm font-medium">You&apos;re offline. Messages will queue until you reconnect.</span>
     </div>
   );
 }

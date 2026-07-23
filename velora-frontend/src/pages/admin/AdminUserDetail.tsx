@@ -139,9 +139,12 @@ export const AdminUserDetail: React.FC = () => {
       </div>
       {setRoleModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="set-role-title">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pt-[env(safe-area-inset-top,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] pb-[env(safe-area-inset-bottom,0px)] sm:p-4" role="dialog" aria-modal="true" aria-labelledby="set-role-title">
             <div className="absolute inset-0 bg-black/60" onClick={() => !saving && setSetRoleModalOpen(false)} />
-            <div className="relative bg-slate-900 border border-slate-700 rounded-xl shadow-xl max-w-sm w-full p-6">
+            <div className="relative bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-xl shadow-xl max-w-sm w-full p-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] sm:pb-6">
+              <div className="sm:hidden flex justify-center -mt-2 mb-3" aria-hidden>
+                <div className="w-10 h-1 rounded-full bg-slate-600" />
+              </div>
               <h2 id="set-role-title" className="text-lg font-semibold mb-4">Set Role</h2>
               <label className="block text-sm text-slate-400 mb-2">New role</label>
               <select

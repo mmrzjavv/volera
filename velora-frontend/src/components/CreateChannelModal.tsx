@@ -106,7 +106,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({ isOpen, 
         )}
         <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Channel name" required />
         <Input label="Description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+        <label className="flex items-center gap-2 text-sm text-[var(--volera-text)] min-h-[44px]">
           <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
           Public channel
         </label>

@@ -78,6 +78,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       closeDisabled={isLoading}
+      tallOnMobile
       title={
         <span className="flex items-center gap-2">
           <Users size={20} className="text-[var(--volera-accent)] shrink-0" />
@@ -89,7 +90,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           Create Group
         </Button>
       }
-      bodyClassName="flex flex-col"
+      bodyClassName="flex flex-col min-h-0"
     >
       <form id="create-group-form" onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
         <div className="p-6 pb-2">
@@ -109,7 +110,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-4 min-h-[120px] max-h-[40vh]">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-4 min-h-[120px] max-h-[min(45dvh,20rem)] sm:max-h-[40vh]">
           <div className="space-y-2">
             {contacts.length === 0 ? (
               <div className="py-4 text-center space-y-3">

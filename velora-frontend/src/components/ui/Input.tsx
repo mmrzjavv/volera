@@ -18,7 +18,7 @@ export function Input({ label, className, id: idProp, ...props }: InputProps) {
       <input
         id={id}
         className={twMerge(
-          'px-3 py-2 min-h-[44px] border border-[var(--volera-border)] rounded-[var(--volera-radius-sm)] bg-[var(--volera-surface-muted)] text-[var(--volera-text)] placeholder:text-[var(--volera-text-muted)]/70 focus:outline-none focus:ring-2 focus:ring-[var(--volera-accent)] focus:border-transparent transition-[var(--volera-motion)]',
+          'px-3 py-2.5 min-h-[44px] border border-[var(--volera-border)] rounded-[var(--volera-radius-sm)] bg-[var(--volera-surface)] text-[var(--volera-text)] placeholder:text-[var(--volera-text-muted)]/70 focus:outline-none focus:ring-2 focus:ring-[var(--volera-accent)] focus:border-transparent transition-shadow duration-[var(--volera-motion)]',
           className
         )}
         {...props}

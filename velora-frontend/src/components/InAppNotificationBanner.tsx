@@ -47,7 +47,7 @@ function NotificationCard({
           'shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium',
           isCall
             ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
-            : 'bg-primary-500/20 text-primary-600 dark:text-primary-400'
+            : 'bg-[var(--volera-accent-soft)] text-[var(--volera-accent)]'
         )}
       >
         {initials}
@@ -111,7 +111,7 @@ export function InAppNotificationBanner() {
   if (items.length === 0) return null;
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none w-full max-w-[360px] px-4">
+    <div className="fixed top-[max(1rem,calc(env(safe-area-inset-top)+0.75rem))] left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none w-full max-w-[360px] px-4">
       <div className="pointer-events-auto flex flex-col gap-2">
         {items.map((item) => (
           <NotificationCard

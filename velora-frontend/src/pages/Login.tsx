@@ -30,20 +30,24 @@ export function Login() {
     try {
       await login({ username, password });
       navigate(from ?? '/', { replace: true });
-    } catch (err) {
+    } catch {
       // Error handled in store
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--volera-bg)] p-4">
-      <div className="max-w-md w-full bg-[var(--volera-surface)] p-6 sm:p-8 rounded-[var(--volera-radius-md)] shadow-lg border border-[var(--volera-border)]">
-        <div className="flex flex-col items-center mb-6">
-          <img src="/icon.svg" alt="Volera" className="w-14 h-14 rounded-2xl mb-3" />
-          <h2 className="text-2xl font-bold text-center text-[var(--volera-text)]">Login to Volera</h2>
+    <div className="volera-auth-shell">
+      <div className="volera-panel volera-fade-up max-w-md w-full p-6 sm:p-8">
+        <div className="flex flex-col items-center mb-8">
+          <img src="/icon.svg" alt="" className="w-16 h-16 rounded-2xl mb-4 shadow-sm" />
+          <p className="text-3xl font-bold tracking-tight text-[var(--volera-text)]">Volera</p>
+          <p className="mt-1 text-sm text-[var(--volera-text-muted)]">Sign in to continue</p>
         </div>
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 p-3 rounded-lg mb-4 text-sm">
+          <div
+            role="alert"
+            className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 p-3 rounded-[var(--volera-radius-sm)] mb-4 text-sm"
+          >
             {error}
           </div>
         )}
@@ -52,6 +56,7 @@ export function Login() {
             label="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
             required
           />
           <Input
@@ -59,16 +64,17 @@ export function Login() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
             required
           />
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? 'Logging in...' : 'Login'}
+          <Button type="submit" className="w-full" isLoading={isLoading}>
+            {isLoading ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
-        <p className="mt-4 text-center text-sm text-[var(--volera-text-muted)]">
-          Don't have an account?{' '}
+        <p className="mt-5 text-center text-sm text-[var(--volera-text-muted)]">
+          Don&apos;t have an account?{' '}
           <Link to="/register" className="text-[var(--volera-accent)] hover:underline font-medium">
-            Register
+            Create one
           </Link>
         </p>
         <p className="mt-3 text-center">
@@ -76,10 +82,10 @@ export function Login() {
             type="button"
             onClick={handleUpdateApp}
             disabled={updating}
-            className="inline-flex items-center gap-1.5 text-sm text-[var(--volera-text-muted)] hover:text-[var(--volera-accent)] transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--volera-text-muted)] hover:text-[var(--volera-accent)] transition-colors disabled:opacity-50 min-h-[44px] px-2"
             title="Clear cache and reload to get the latest version"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={14} className={updating ? 'animate-spin' : ''} />
             {updating ? 'Updating…' : 'Update app'}
           </button>
         </p>

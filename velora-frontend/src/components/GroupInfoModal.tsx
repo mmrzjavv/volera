@@ -108,7 +108,8 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
       closeDisabled={busy}
       title="Group Info"
       maxWidth="max-w-md"
-      bodyClassName="px-6 py-4"
+      tallOnMobile
+      bodyClassName="px-4 sm:px-6 py-4"
       footer={
         showDeleteConfirm ? (
           <div className="space-y-2">

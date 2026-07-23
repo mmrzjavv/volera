@@ -89,7 +89,7 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        <div className="flex items-center justify-between p-4 border-b border-slate-800 md:justify-start">
+        <div className="flex items-center justify-between p-4 pt-[max(1rem,env(safe-area-inset-top))] border-b border-slate-800 md:justify-start md:pt-4">
           <div>
             <h1 className="font-bold text-lg">Volera Admin</h1>
             <p className="text-xs text-slate-400 mt-1">{user?.username}</p>
@@ -134,7 +134,7 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto p-4 md:p-6 min-w-0 pl-[env(safe-area-inset-left)] max-w-7xl mx-auto w-full">{children}</main>
+      <main className="flex-1 overflow-auto p-4 md:p-6 min-w-0 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] max-w-7xl mx-auto w-full">{children}</main>
     </div>
   );
 };

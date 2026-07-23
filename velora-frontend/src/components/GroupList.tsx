@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useChatStore } from '../store/useChatStore';
 import { Users, Plus, Megaphone } from 'lucide-react';
 import { clsx } from 'clsx';
+import { ProfileAvatar } from './ProfileAvatar';
 
 interface GroupListProps {
   onCreateGroup: () => void;
@@ -19,16 +20,17 @@ export const GroupList: React.FC<GroupListProps> = ({ onCreateGroup, onCreateCha
   const regularGroups = groups.filter((g) => !g.isChannel);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="p-4 border-b border-gray-300 dark:border-gray-700 flex justify-between items-center bg-gray-100 dark:bg-gray-900 gap-2">
-        <h2 className="font-bold text-gray-700 dark:text-gray-200">Groups & Channels</h2>
+    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--volera-bg)]">
+      <div className="p-4 border-b border-[var(--volera-border)] flex justify-between items-center bg-[var(--volera-surface)] gap-2">
+        <h2 className="font-bold text-[var(--volera-text)]">Groups & Channels</h2>
         <div className="flex items-center gap-1">
           {onCreateChannel && (
             <button
               type="button"
               onClick={onCreateChannel}
-              className="p-2 text-[var(--volera-accent)] hover:bg-[var(--volera-accent)]/10 rounded-full transition-colors"
+              className="volera-icon-btn volera-icon-btn--accent"
               title="Create Channel"
+              aria-label="Create Channel"
             >
               <Megaphone size={20} />
             </button>
@@ -36,8 +38,9 @@ export const GroupList: React.FC<GroupListProps> = ({ onCreateGroup, onCreateCha
           <button
             type="button"
             onClick={onCreateGroup}
-            className="p-2 text-[var(--volera-accent)] hover:bg-[var(--volera-accent)]/10 rounded-full transition-colors"
+            className="volera-icon-btn volera-icon-btn--accent"
             title="Create Group"
+            aria-label="Create Group"
           >
             <Plus size={20} />
           </button>
@@ -53,20 +56,24 @@ export const GroupList: React.FC<GroupListProps> = ({ onCreateGroup, onCreateCha
             key={channel.id}
             onClick={() => selectGroup(channel)}
             className={clsx(
-              'p-4 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3',
+              'p-4 border-b border-[var(--volera-border)] cursor-pointer hover:bg-[var(--volera-surface-muted)] transition-colors flex items-center gap-3',
               selectedGroup?.id === channel.id && 'bg-[var(--volera-accent)]/10 border-l-4 border-l-[var(--volera-accent)]'
             )}
           >
             <div className="w-10 h-10 rounded-full bg-[var(--volera-accent)]/15 flex items-center justify-center text-[var(--volera-accent)] overflow-hidden font-bold">
               {channel.profilePictureUrl ? (
-                <img src={channel.profilePictureUrl} alt="" className="w-full h-full object-cover" />
+                <ProfileAvatar
+                  src={channel.profilePictureUrl}
+                  name={channel.name}
+                  textClassName="text-sm text-[var(--volera-accent)]"
+                />
               ) : (
                 <Megaphone size={18} />
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-900 dark:text-white truncate">{channel.name}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              <div className="font-medium text-[var(--volera-text)] truncate">{channel.name}</div>
+              <div className="text-xs text-[var(--volera-text-muted)] truncate">
                 {channel.publicUsername ? `@${channel.publicUsername}` : 'Channel'}
               </div>
             </div>
@@ -97,16 +104,20 @@ export const GroupList: React.FC<GroupListProps> = ({ onCreateGroup, onCreateCha
               key={group.id}
               onClick={() => selectGroup(group)}
               className={clsx(
-                'p-4 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3',
+                'p-4 border-b border-[var(--volera-border)] cursor-pointer hover:bg-[var(--volera-surface-muted)] transition-colors flex items-center gap-3',
                 selectedGroup?.id === group.id && 'bg-[var(--volera-accent)]/10 border-l-4 border-l-[var(--volera-accent)]'
               )}
             >
               <div className="w-10 h-10 rounded-full bg-[var(--volera-accent)]/15 flex items-center justify-center text-[var(--volera-accent)] overflow-hidden font-bold">
-                {group.name[0].toUpperCase()}
+                <ProfileAvatar
+                  src={group.profilePictureUrl}
+                  name={group.name}
+                  textClassName="text-sm text-[var(--volera-accent)]"
+                />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900 dark:text-white truncate">{group.name}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">Group</div>
+                <div className="font-medium text-[var(--volera-text)] truncate">{group.name}</div>
+                <div className="text-xs text-[var(--volera-text-muted)] truncate">Group</div>
               </div>
             </div>
           ))

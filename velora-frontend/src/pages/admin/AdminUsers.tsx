@@ -202,16 +202,19 @@ export const AdminUsers: React.FC = () => {
 
       {sessionsModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pt-[env(safe-area-inset-top,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] pb-[env(safe-area-inset-bottom,0px)] sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="sessions-modal-title"
           onClick={closeSessionsModal}
         >
           <div
-            className="bg-slate-900 border border-slate-700 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+            className="bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-xl shadow-xl w-full max-w-2xl max-h-[min(92dvh,100%)] h-[min(85dvh,100%)] sm:h-auto sm:max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="sm:hidden flex justify-center pt-2 shrink-0" aria-hidden>
+              <div className="w-10 h-1 rounded-full bg-slate-600" />
+            </div>
             <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 border-b border-slate-800 shrink-0">
               <h2 id="sessions-modal-title" className="text-lg sm:text-xl font-semibold text-white truncate">
                 Sessions — {sessionsModal.username}
@@ -225,7 +228,7 @@ export const AdminUsers: React.FC = () => {
                 <X size={20} />
               </button>
             </div>
-            <div className="overflow-y-auto flex-1 min-h-0 px-4 py-3 sm:px-6 sm:py-4">
+            <div className="overflow-y-auto flex-1 min-h-0 px-4 py-3 sm:px-6 sm:py-4 overscroll-contain">
               {sessionsLoading ? (
                 <div className="py-8 text-center text-slate-400">Loading sessions...</div>
               ) : sessions.length === 0 ? (

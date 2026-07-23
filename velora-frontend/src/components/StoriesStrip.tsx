@@ -15,26 +15,24 @@ export const StoriesStrip: React.FC = () => {
 
   return (
     <>
-      <div className="shrink-0 border-b border-[var(--volera-border)] bg-[var(--volera-surface)] px-3 py-2">
-        <div className="flex gap-3 overflow-x-auto overflow-y-hidden pb-1 scrollbar-thin">
+      <div className="shrink-0 border-b border-[var(--volera-border)] bg-[var(--volera-surface)] px-3 py-2.5">
+        <div className="flex gap-3 overflow-x-auto overflow-y-hidden pb-1 message-input-scrollbar">
           {rings.map((ring) => (
-            <button
+            <div
               key={ring.userId}
-              type="button"
-              onClick={() => {
-                if (ring.isOwn && ring.stories.length === 0) {
-                  openComposer();
-                  return;
-                }
-                if (ring.isOwn && ring.stories.length > 0) {
-                  openViewer(ring.userId);
-                  return;
-                }
-                openViewer(ring.userId);
-              }}
-              className="flex flex-col items-center gap-1 min-w-[64px] max-w-[72px] shrink-0 touch-manipulation"
+              className="relative flex flex-col items-center gap-1 min-w-[64px] max-w-[72px] shrink-0"
             >
-              <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  if (ring.isOwn && ring.stories.length === 0) {
+                    openComposer();
+                    return;
+                  }
+                  openViewer(ring.userId);
+                }}
+                className="flex flex-col items-center gap-1 w-full touch-manipulation"
+              >
                 <div
                   className={clsx(
                     'w-14 h-14 rounded-full p-[2px]',
@@ -57,24 +55,24 @@ export const StoriesStrip: React.FC = () => {
                     )}
                   </div>
                 </div>
-                {ring.isOwn && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openComposer();
-                    }}
-                    className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[var(--volera-accent)] text-white flex items-center justify-center shadow"
-                    aria-label="Add story"
-                  >
-                    <Plus size={12} />
-                  </button>
-                )}
-              </div>
-              <span className="text-[11px] text-[var(--volera-text-muted)] truncate w-full text-center">
-                {ring.isOwn ? 'Your story' : ring.displayName.split(' ')[0]}
-              </span>
-            </button>
+                <span className="text-[11px] text-[var(--volera-text-muted)] truncate w-full text-center">
+                  {ring.isOwn ? 'Your story' : ring.displayName.split(' ')[0]}
+                </span>
+              </button>
+              {ring.isOwn && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openComposer();
+                  }}
+                  className="absolute top-9 right-0 w-6 h-6 rounded-full bg-[var(--volera-accent)] text-white flex items-center justify-center shadow border-2 border-[var(--volera-surface)]"
+                  aria-label="Add story"
+                >
+                  <Plus size={12} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </div>
