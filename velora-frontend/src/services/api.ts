@@ -85,41 +85,102 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/** Single-flight refresh so concurrent 401s / page checks share one request. */
+let refreshPromise: Promise<string | null> | null = null;
+
+function persistAuthPayload(payload: AuthResponse): string {
+  localStorage.setItem('token', payload.token);
+  localStorage.setItem('refreshToken', payload.refreshToken);
+  if (payload.user) {
+    localStorage.setItem('user', JSON.stringify(payload.user));
+  }
+  api.defaults.headers.common['Authorization'] = `Bearer ${payload.token}`;
+  return payload.token;
+}
+
+function clearAuthStorage(): void {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  delete api.defaults.headers.common['Authorization'];
+}
+
+/** Clear session and send the user to the matching login page. */
+export function kickOutToLogin(): void {
+  clearAuthStorage();
+  if (typeof window === 'undefined') return;
+  const path = window.location.pathname;
+  if (path === '/login' || path === '/register' || path === '/admin/login') return;
+  const loginPath = path.startsWith('/admin') ? '/admin/login' : '/login';
+  window.location.assign(loginPath);
+}
+
+/**
+ * Exchange refresh token for a new access token.
+ * Returns the new access token, or null if refresh is rejected / impossible.
+ * Network / server errors are rethrown so callers can avoid logging the user out offline.
+ */
+export async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    const token = localStorage.getItem('token');
+    if (!refreshToken || !token) return null;
+
+    try {
+      const response = await axios.post<ApiResponse<AuthResponse>>(
+        `${API_URL}/Auth/refresh-token`,
+        { accessToken: token, refreshToken },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      const payload = response.data?.data;
+      if (!payload?.token || !payload.refreshToken) return null;
+      return persistAuthPayload(payload);
+    } catch (error) {
+      if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+        return null;
+      }
+      // Missing response (offline) or 5xx — let caller decide; do not treat as logout.
+      throw error;
+    }
+  })().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
 
         // Handle 401 Unauthorized (Token Expired)
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+            const requestUrl = String(originalRequest.url ?? '');
+            // Never try to refresh the refresh/login endpoints themselves.
+            if (requestUrl.includes('/Auth/refresh-token')) {
+                kickOutToLogin();
+                return Promise.reject(error);
+            }
+            if (requestUrl.includes('/Auth/login') || requestUrl.includes('/Auth/register')) {
+                return Promise.reject(error);
+            }
+
             originalRequest._retry = true;
             try {
-                const refreshToken = localStorage.getItem('refreshToken');
-                const token = localStorage.getItem('token');
-
-                if (refreshToken && token) {
-                    const response = await axios.post<ApiResponse<AuthResponse>>(`${API_URL}/Auth/refresh-token`, {
-                        accessToken: token,
-                        refreshToken: refreshToken
-                    });
-                    const payload = response.data?.data;
-                    if (payload?.token) {
-                        localStorage.setItem('token', payload.token);
-                        localStorage.setItem('refreshToken', payload.refreshToken);
-
-                        // Update default headers
-                        api.defaults.headers.common['Authorization'] = `Bearer ${payload.token}`;
-                        originalRequest.headers['Authorization'] = `Bearer ${payload.token}`;
-
-                        return api(originalRequest);
-                    }
-                }
-            } catch (refreshError) {
-                // If refresh fails, logout
-                authService.logout();
-                window.location.href = '/login';
-                return Promise.reject(refreshError);
+              const newToken = await refreshAccessToken();
+              if (newToken) {
+                  originalRequest.headers = originalRequest.headers ?? {};
+                  originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                  return api(originalRequest);
+              }
+              kickOutToLogin();
+            } catch {
+              // Offline / transient refresh failure — do not hard-kick; reject original 401.
             }
+            return Promise.reject(error);
         }
 
         const addToast = useToastStore.getState().addToast;
@@ -142,9 +203,7 @@ export const authService = {
     const response = await api.post<ApiResponse<AuthResponse>>('/Auth/login', data);
     const payload = response.data?.data;
     if (payload?.token) {
-        localStorage.setItem('token', payload.token);
-        localStorage.setItem('refreshToken', payload.refreshToken);
-        localStorage.setItem('user', JSON.stringify(payload.user));
+        persistAuthPayload(payload);
     }
     return payload!;
   },
@@ -152,10 +211,13 @@ export const authService = {
     const response = await api.post<ApiResponse<{ userId: string }>>('/Auth/register', data);
     return response.data?.data ?? response.data as unknown as { userId: string };
   },
+  /** Proactively refresh the session (extends refresh-token lifetime). */
+  refreshSession: async (): Promise<boolean> => {
+    const newToken = await refreshAccessToken();
+    return Boolean(newToken);
+  },
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
+    clearAuthStorage();
   },
 };
 

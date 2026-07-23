@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import { useThemeStore, syncThemeToDom } from './store/useThemeStore';
 import { syncLocaleToDom, useLocaleStore } from './store/useLocaleStore';
@@ -36,15 +36,38 @@ import { OfflineBanner } from './components/OfflineBanner';
 import { InstallBanner } from './components/InstallBanner';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, checkAuth } = useAuthStore();
+  const location = useLocation();
+  const [ready, setReady] = useState(false);
+
+  // Refresh tokens on every protected page so sessions stay alive longer;
+  // kick out when both access and refresh tokens are invalid/expired.
+  useEffect(() => {
+    let cancelled = false;
+    setReady(false);
+    void checkAuth({ forceRefresh: true }).finally(() => {
+      if (!cancelled) setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname, checkAuth]);
 
   // Ensure push is subscribed on every private page so 1:1 notifications work even if user didn't land on Chat first
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!ready || !isAuthenticated) return;
     ensurePushSubscription();
-  }, [isAuthenticated]);
+  }, [ready, isAuthenticated]);
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-[var(--volera-text-muted)]">
+        Checking session…
+      </div>
+    );
+  }
+
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function App() {
@@ -54,7 +77,8 @@ function App() {
   const locale = useLocaleStore((s) => s.locale);
 
   useEffect(() => {
-    checkAuth();
+    // Soft check on boot (refresh only if access token expired)
+    void checkAuth({ forceRefresh: false });
   }, [checkAuth]);
 
   useEffect(() => {
@@ -80,10 +104,12 @@ function App() {
 
   return (
     <BrowserRouter>
-      <OfflineBanner />
+      <div className="volera-banner-stack" aria-live="polite">
+        <UpdateBanner />
+        <OfflineBanner />
+      </div>
       <NotificationClickHandler />
       <InAppNotificationBanner />
-      <UpdateBanner />
       <InstallBanner />
       <ToastContainer />
       <ConfirmationDialog />
