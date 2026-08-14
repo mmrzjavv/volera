@@ -1,7 +1,8 @@
 using Core.Application.Interfaces;
-using Core.Domain.Entities;
+using Core.Application.Logging;
 using Core.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using WebPush;
 
@@ -12,41 +13,44 @@ public class PushNotificationService : IPushNotificationService
     private readonly IConfiguration _configuration;
     private readonly IPushSubscriptionRepository _subscriptionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<PushNotificationService> _logger;
     private string? _vapidPublicKey;
     private string? _vapidPrivateKey;
+    private readonly bool _vapidConfigured;
 
     public PushNotificationService(
         IConfiguration configuration,
         IPushSubscriptionRepository subscriptionRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ILogger<PushNotificationService> logger)
     {
         _configuration = configuration;
         _subscriptionRepository = subscriptionRepository;
         _unitOfWork = unitOfWork;
-        LoadVapidKeys();
+        _logger = logger;
+        _vapidConfigured = LoadVapidKeys();
     }
 
-    private void LoadVapidKeys()
+    private static int _vapidWarningEmitted;
+
+    private bool LoadVapidKeys()
     {
         _vapidPublicKey = _configuration["PushNotifications:VapidPublicKey"] ?? _configuration["VapidPublicKey"];
         _vapidPrivateKey = _configuration["PushNotifications:VapidPrivateKey"] ?? _configuration["VapidPrivateKey"];
 
-        // If keys are not configured, generate them (for development only)
-        if (string.IsNullOrEmpty(_vapidPublicKey) || string.IsNullOrEmpty(_vapidPrivateKey))
+        if (!string.IsNullOrEmpty(_vapidPublicKey) && !string.IsNullOrEmpty(_vapidPrivateKey))
+            return true;
+
+        if (Interlocked.Exchange(ref _vapidWarningEmitted, 1) == 0)
         {
-            Console.WriteLine("[PushNotificationService] WARNING: VAPID keys not configured. Generating temporary keys for development.");
-            Console.WriteLine("[PushNotificationService] For production, configure VAPID keys in appsettings.json");
-
-            // Generate temporary keys using WebPush library
-            // Note: In production, you should generate these once and store them securely
-            var keys = VapidHelper.GenerateVapidKeys();
-            _vapidPublicKey = keys.PublicKey;
-            _vapidPrivateKey = keys.PrivateKey;
-
-            Console.WriteLine($"[PushNotificationService] Generated VAPID Public Key: {_vapidPublicKey}");
-            Console.WriteLine($"[PushNotificationService] Add this to appsettings.json: \"VapidPublicKey\": \"{_vapidPublicKey}\"");
-            Console.WriteLine($"[PushNotificationService] Add this to appsettings.json: \"VapidPrivateKey\": \"{_vapidPrivateKey}\"");
+            AppLog.Warning(_logger, AppLogEvents.PushMisconfigured,
+                "Reason: VapidKeysMissing | Result: UsingEphemeralDevKeys");
         }
+
+        var keys = VapidHelper.GenerateVapidKeys();
+        _vapidPublicKey = keys.PublicKey;
+        _vapidPrivateKey = keys.PrivateKey;
+        return false;
     }
 
     public Task<string> GetVapidPublicKeyAsync()
@@ -58,10 +62,7 @@ public class PushNotificationService : IPushNotificationService
     {
         var userSubscriptions = await _subscriptionRepository.GetByUserIdAsync(userId);
         if (!userSubscriptions.Any())
-        {
-            Console.WriteLine($"[PushNotificationService] No push subscriptions found for user {userId}");
             return;
-        }
 
         var payload = JsonSerializer.Serialize(new
         {
@@ -92,9 +93,10 @@ public class PushNotificationService : IPushNotificationService
             }
             catch (WebPushException ex)
             {
-                Console.WriteLine($"[PushNotificationService] Error sending push to {userId}: {ex.Message}");
+                AppLog.Warning(_logger, AppLogEvents.PushFailed, ex,
+                    "UserId: {UserId} | StatusCode: {StatusCode} | Error: {ErrorType} | Result: Failure",
+                    userId, ex.StatusCode, ex.GetType().Name);
 
-                // Remove invalid subscriptions
                 if (ex.StatusCode == System.Net.HttpStatusCode.Gone ||
                     ex.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
@@ -104,27 +106,30 @@ public class PushNotificationService : IPushNotificationService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PushNotificationService] Unexpected error for user {userId}: {ex.Message}");
+                AppLog.Error(_logger, AppLogEvents.PushFailed, ex,
+                    "UserId: {UserId} | Error: {ErrorType} | Result: Failure",
+                    userId, ex.GetType().Name);
                 return 0;
             }
         });
 
         var results = await Task.WhenAll(tasks);
         var sentCount = results.Sum();
-        Console.WriteLine($"[PushNotificationService] Push notification sent to user {userId} ({sentCount} subscription(s))");
+        if (sentCount > 0)
+        {
+            AppLog.Info(_logger, AppLogEvents.PushSent,
+                "UserId: {UserId} | DeliveredCount: {DeliveredCount} | VapidConfigured: {VapidConfigured} | Result: Success",
+                userId, sentCount, _vapidConfigured);
+        }
     }
 
     public async Task AddSubscriptionAsync(Guid userId, string endpoint, string p256dh, string auth)
     {
-        // Check if subscription already exists
         var existingSubscription = await _subscriptionRepository.GetByEndpointAsync(endpoint);
         if (existingSubscription != null)
         {
-            // Update existing subscription if needed
             if (existingSubscription.UserId != userId)
             {
-                // If the endpoint exists but belongs to a different user, 
-                // we should remove the old association and create a new one.
                 _subscriptionRepository.Delete(existingSubscription);
                 await _unitOfWork.SaveChangesAsync();
 
@@ -133,20 +138,17 @@ public class PushNotificationService : IPushNotificationService
             }
             else
             {
-                // Same user, same endpoint. Just update keys/timestamp.
                 existingSubscription.UpdateKeys(p256dh, auth);
                 existingSubscription.UpdatedAt = DateTime.UtcNow;
             }
         }
         else
         {
-            // Create new subscription
             var subscription = new Core.Domain.Entities.PushSubscription(userId, endpoint, p256dh, auth);
             await _subscriptionRepository.AddAsync(subscription);
         }
 
         await _unitOfWork.SaveChangesAsync();
-        Console.WriteLine($"[PushNotificationService] Added/Updated push subscription for user {userId}");
     }
 
     public async Task RemoveAllSubscriptionsAsync(Guid userId)

@@ -1,15 +1,16 @@
 using System.Diagnostics;
 using Core.Application.Commands;
 using Core.Application.Interfaces;
+using Core.Application.Logging;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Core.Application.Behaviors;
 
 /// <summary>
-/// MediatR pipeline behavior that logs the lifecycle of each request/handler,
-/// including the current user id and execution time, to create a clear story
-/// of what happened in the system. For guest flows (no JWT), logs sender/guest context when available.
+/// MediatR pipeline: no per-request success spam. Logs only failures for commands/queries
+/// with structured context (never request payloads — they may contain passwords/tokens).
+/// Business success events belong in handlers/controllers via <see cref="AppLogEvents"/>.
 /// </summary>
 public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
@@ -31,37 +32,26 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         CancellationToken cancellationToken)
     {
         var requestName = typeof(TRequest).Name;
+        var isCommand = requestName.EndsWith("Command", StringComparison.Ordinal);
         var userId = _currentUserService.UserId;
-
-        // For guest flows (no JWT), show SendMessageCommand SenderId or "Guest" for SendGuestMessageCommand so logs are clear
-        var userLabel = userId.HasValue ? userId.ToString() : (request switch
-        {
-            SendMessageCommand sm => $"Guest/Sender {sm.SenderId}",
-            SendGuestMessageCommand => "Guest",
-            _ => "(null)"
-        });
-
-        var activityId = Activity.Current?.Id ?? Guid.NewGuid().ToString("N");
-
-        _logger.LogInformation(
-            "Handling {RequestName} for User {UserLabel} with ActivityId {ActivityId} and Payload {@Request}",
-            requestName,
-            userLabel,
-            activityId,
-            request);
-
+        var sessionId = _currentUserService.SessionId;
         var stopwatch = Stopwatch.StartNew();
+
         try
         {
             var response = await next();
             stopwatch.Stop();
 
-            _logger.LogInformation(
-                "Handled {RequestName} for User {UserLabel} in {ElapsedMilliseconds} ms with ActivityId {ActivityId}",
-                requestName,
-                userLabel,
-                stopwatch.ElapsedMilliseconds,
-                activityId);
+            // Duration-only at Debug for commands — invisible in production Information floor.
+            if (isCommand)
+            {
+                _logger.LogDebug(
+                    "CommandCompleted | RequestName: {RequestName} | UserId: {UserId} | SessionId: {SessionId} | ElapsedMs: {ElapsedMs}",
+                    requestName,
+                    userId,
+                    sessionId,
+                    stopwatch.ElapsedMilliseconds);
+            }
 
             return response;
         }
@@ -69,16 +59,35 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         {
             stopwatch.Stop();
 
-            _logger.LogError(
+            // Expected domain/auth failures are logged as business events by controllers/handlers.
+            if (ex is UnauthorizedAccessException
+                or KeyNotFoundException
+                or InvalidOperationException
+                or FluentValidation.ValidationException
+                or Exceptions.MaxSessionsReachedException)
+            {
+                _logger.LogDebug(
+                    ex,
+                    "RequestRejected | RequestName: {RequestName} | UserId: {UserId} | Error: {ErrorType} | ElapsedMs: {ElapsedMs}",
+                    requestName,
+                    userId,
+                    ex.GetType().Name,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
+
+            AppLog.Error(
+                _logger,
+                AppLogEvents.RequestFailed,
                 ex,
-                "Error handling {RequestName} for User {UserLabel} after {ElapsedMilliseconds} ms with ActivityId {ActivityId}",
+                "RequestName: {RequestName} | UserId: {UserId} | SessionId: {SessionId} | ElapsedMs: {ElapsedMs} | Error: {ErrorType}",
                 requestName,
-                userLabel,
+                userId,
+                sessionId,
                 stopwatch.ElapsedMilliseconds,
-                activityId);
+                ex.GetType().Name);
 
             throw;
         }
     }
 }
-

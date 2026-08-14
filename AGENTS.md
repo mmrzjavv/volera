@@ -195,6 +195,7 @@ Backend calls this via `AiService:BaseUrl` (e.g. `http://localhost:8000`). Widge
 - `docs/development.md`
 - `docs/testing.md`
 - `docs/security.md`
+- `docs/logging.md` — Serilog → Seq structured event conventions
 - `docs/credential-rotation.md`
 - `docs/minio-storage.md`
 - `docs/message-state-machine.md`

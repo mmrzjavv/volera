@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Core.Application.Logging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.DTOs;
@@ -30,16 +31,16 @@ public class ErrorController : ControllerBase
 
         var category = string.IsNullOrWhiteSpace(request.Category) ? "React" : request.Category.Trim();
 
-        _logger.LogError(
-            "Frontend error [{Category}] {Message}. Url={Url} UserId={UserId} UserAgent={UserAgent} StackTrace={StackTrace} ComponentStack={ComponentStack}",
+        AppLog.Error(_logger, AppLogEvents.UnhandledException, null,
+            "Source: Frontend | Category: {Category} | UserId: {UserId} | Url: {Url} | Message: {ErrorMessage} | Result: Failure",
             category,
-            request.Message.Trim(),
-            request.Url?.Trim(),
             userId,
-            request.UserAgent?.Trim(),
-            request.StackTrace?.Trim(),
-            request.ComponentStack?.Trim());
+            request.Url?.Trim(),
+            Truncate(request.Message.Trim(), 500));
 
         return NoContent();
     }
+
+    private static string Truncate(string value, int max) =>
+        value.Length <= max ? value : value[..max] + "…";
 }

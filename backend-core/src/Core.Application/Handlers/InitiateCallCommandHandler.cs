@@ -93,14 +93,11 @@ public class InitiateCallCommandHandler : IRequestHandler<InitiateCallCommand, G
         await _unitOfWork.SaveChangesAsync();
 
         // Publish domain events
-        Console.WriteLine($"[InitiateCallCommandHandler] Publishing {call.DomainEvents.Count} domain event(s)");
         foreach (var domainEvent in call.DomainEvents)
         {
-            Console.WriteLine($"[InitiateCallCommandHandler] Publishing event: {domainEvent.GetType().Name}");
             await _mediator.Publish(domainEvent);
         }
         call.ClearDomainEvents();
-        Console.WriteLine($"[InitiateCallCommandHandler] Domain events published and cleared");
 
         return call.Id;
     }

@@ -1,6 +1,8 @@
 using Core.Application.Interfaces;
+using Core.Application.Logging;
 using Core.Domain.Interfaces;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 using WebAPI.Hubs;
 
 namespace WebAPI.Services;
@@ -13,6 +15,7 @@ public class GroupCallNotificationService : IGroupCallNotificationService
     private readonly IGroupRepository _groupRepository;
     private readonly IConnectionManager _connectionManager;
     private readonly IPushNotificationService _pushNotificationService;
+    private readonly ILogger<GroupCallNotificationService> _logger;
 
     public GroupCallNotificationService(
         IHubContext<CallHub> hubContext,
@@ -20,7 +23,8 @@ public class GroupCallNotificationService : IGroupCallNotificationService
         IGroupCallRepository groupCallRepository,
         IGroupRepository groupRepository,
         IConnectionManager connectionManager,
-        IPushNotificationService pushNotificationService)
+        IPushNotificationService pushNotificationService,
+        ILogger<GroupCallNotificationService> logger)
     {
         _hubContext = hubContext;
         _userRepository = userRepository;
@@ -28,6 +32,7 @@ public class GroupCallNotificationService : IGroupCallNotificationService
         _groupRepository = groupRepository;
         _connectionManager = connectionManager;
         _pushNotificationService = pushNotificationService;
+        _logger = logger;
     }
 
     public async Task SendGroupCallInitiated(Guid groupCallId, Guid groupId, Guid initiatorId, string initiatorName, bool isVideo, IEnumerable<Guid> memberUserIds)
@@ -82,7 +87,9 @@ public class GroupCallNotificationService : IGroupCallNotificationService
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[GroupCallNotificationService] Push failed for user {userId}: {ex.Message}");
+                    AppLog.Warning(_logger, AppLogEvents.PushFailed, ex,
+                        "UserId: {UserId} | GroupCallId: {GroupCallId} | Error: {ErrorType} | Result: Failure",
+                        userId, groupCallId, ex.GetType().Name);
                 }
             }
         }

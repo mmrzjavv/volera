@@ -1,0 +1,11 @@
+# Optional local override: ship Serilog to the Seq container on chat-app-net
+# instead of whatever SEQ_URL is in .env (e.g. a remote panel).
+#
+#   docker compose --env-file .env -f docker-compose.yml -f docker-compose.seq-local.yml up -d webapi
+
+services:
+  webapi:
+    environment:
+      SEQ_URL: http://seq
+      Seq__ServerUrl: http://seq
+      Seq__UiUrl: http://localhost:5341

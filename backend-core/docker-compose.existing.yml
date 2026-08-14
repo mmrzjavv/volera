@@ -35,6 +35,9 @@ services:
       Jwt__Audience: "Volera"
       Jwt__SupportUser__Key: "${JWT_SECRET}"
       Auth__AllowDemoCompanyOtp: "false"
+      SEQ_URL: "${SEQ_URL:-http://seq}"
+      Seq__ServerUrl: "${Seq__ServerUrl:-${SEQ_URL:-http://seq}}"
+      Seq__UiUrl: "${SEQ_UI_URL:-http://localhost:5341}"
       SeedAdmin__Username: "${SEED_ADMIN_USERNAME}"
       SeedAdmin__Password: "${SEED_ADMIN_PASSWORD}"
       SeedAdmin__FirstName: Admin

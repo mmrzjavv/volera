@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MediatR;
 using Core.Application.Commands;
 using Core.Application.Queries;
+using Core.Application.Logging;
 using WebAPI.Extensions;
 using WebAPI.Models;
 using Core.Application.Interfaces;
@@ -40,7 +41,6 @@ public class CompanyController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterCompanyRequest request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Company registration requested for mobile {Mobile}.", request.MobileNumber);
         var command = new RegisterCompanyCommand
         {
             Name = request.Name,
@@ -49,7 +49,9 @@ public class CompanyController : ControllerBase
             Address = request.Address
         };
         var result = await _mediator.Send(command, cancellationToken);
-        _logger.LogInformation("Company registered. CompanyId: {CompanyId}", result.CompanyId);
+        AppLog.Info(_logger, AppLogEvents.CompanyRegistered,
+            "CompanyId: {CompanyId} | Mobile: {Mobile} | Result: Success",
+            result.CompanyId, request.MobileNumber);
         return new ObjectResult(ApiResponse<object>.Ok(new
         {
             companyId = result.CompanyId,
@@ -74,7 +76,16 @@ public class CompanyController : ControllerBase
         };
         var result = await _mediator.Send(command, cancellationToken);
         if (result == null)
+        {
+            AppLog.Warning(_logger, AppLogEvents.CompanyLoginFailed,
+                "Mobile: {Mobile} | IP: {ClientIp} | Reason: InvalidCredentials | Result: Failure",
+                request.MobileNumber, HttpContext.Connection.RemoteIpAddress?.ToString());
             return this.ApiUnauthorized("Invalid mobile number or token.");
+        }
+
+        AppLog.Info(_logger, AppLogEvents.CompanyLoginSucceeded,
+            "CompanyId: {CompanyId} | Mobile: {Mobile} | IP: {ClientIp} | Method: Token | Result: Success",
+            result.CompanyId, request.MobileNumber, HttpContext.Connection.RemoteIpAddress?.ToString());
         return this.Success(new
         {
             companyId = result.CompanyId,

@@ -30,13 +30,8 @@ public class AesGcmEncryptionService : IEncryptionService
             throw new ArgumentException($"Session key must be {KeySize} bytes", nameof(sessionKey));
 
         var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
-        _logger.LogInformation("[BACKEND] Encrypting. Plaintext length: {Length}, Session key (hex): {KeyHex}",
-            plaintextBytes.Length, Convert.ToHexString(sessionKey));
         var encryptedBytes = EncryptBytes(plaintextBytes, sessionKey);
-        var result = Convert.ToBase64String(encryptedBytes);
-        _logger.LogInformation("[BACKEND] Encrypted. Result length: {Length}, First 20 chars: {Preview}",
-            result.Length, result.Substring(0, Math.Min(20, result.Length)));
-        return result;
+        return Convert.ToBase64String(encryptedBytes);
     }
 
     public string Decrypt(string encryptedData, byte[] sessionKey)
@@ -47,21 +42,15 @@ public class AesGcmEncryptionService : IEncryptionService
         if (sessionKey == null || sessionKey.Length != KeySize)
             throw new ArgumentException($"Session key must be {KeySize} bytes", nameof(sessionKey));
 
-        _logger.LogInformation("[BACKEND] Decrypting. Encrypted data length: {Length}, First 20 chars: {Preview}",
-            encryptedData.Length, encryptedData.Substring(0, Math.Min(20, encryptedData.Length)));
-        var encryptedBytes = Convert.FromBase64String(encryptedData);
-        _logger.LogInformation("[BACKEND] Decrypting. Session key (hex): {KeyHex}",
-            Convert.ToHexString(sessionKey));
         try
         {
+            var encryptedBytes = Convert.FromBase64String(encryptedData);
             var decryptedBytes = DecryptBytes(encryptedBytes, sessionKey);
-            var result = Encoding.UTF8.GetString(decryptedBytes);
-            _logger.LogInformation("[BACKEND] Decrypted successfully. Result length: {Length}", result.Length);
-            return result;
+            return Encoding.UTF8.GetString(decryptedBytes);
         }
         catch (Exception ex)
         {
-            _logger.LogError("[BACKEND] Decryption failed: {Error}", ex.Message);
+            _logger.LogError(ex, "DecryptionFailed | Error: {ErrorType} | Result: Failure", ex.GetType().Name);
             throw;
         }
     }

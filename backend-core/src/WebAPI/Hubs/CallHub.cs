@@ -13,31 +13,34 @@ public class CallHub : Hub
 {
     private readonly IOnlineUserService _onlineUserService;
     private readonly IConnectionManager _connectionManager;
+    private readonly ILogger<CallHub> _logger;
 
-    public CallHub(IOnlineUserService onlineUserService, IConnectionManager connectionManager)
+    public CallHub(
+        IOnlineUserService onlineUserService,
+        IConnectionManager connectionManager,
+        ILogger<CallHub> logger)
     {
         _onlineUserService = onlineUserService;
         _connectionManager = connectionManager;
+        _logger = logger;
     }
 
     public override async Task OnConnectedAsync()
     {
-        var userIdClaim = Context.User?.FindFirst("userId")?.Value;
-        var nameIdentifier = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        Console.WriteLine($"[CallHub] User connected - userId claim: {userIdClaim}, NameIdentifier: {nameIdentifier}, ConnectionId: {Context.ConnectionId}");
+        var userIdClaim = Context.User?.FindFirst("userId")?.Value
+            ?? Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
         if (userIdClaim != null && Guid.TryParse(userIdClaim, out var userId))
         {
-            // Register connection for notification (PRIMARY method for sending notifications)
             _connectionManager.RegisterConnection(Context.ConnectionId, userIdClaim);
-
             await _onlineUserService.UserConnected(userId);
-            // Notify all other clients that this user is now online
             await Clients.Others.SendAsync("UserOnline", userId);
         }
         else
         {
-            Console.WriteLine($"[CallHub] WARNING: Could not parse userId from claims. userIdClaim: {userIdClaim}");
+            _logger.LogWarning(
+                "CallHubConnectFailed | ConnectionId: {ConnectionId} | Reason: MissingUserId | Result: Failure",
+                Context.ConnectionId);
         }
         await base.OnConnectedAsync();
     }

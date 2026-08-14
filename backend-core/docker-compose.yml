@@ -67,6 +67,10 @@ services:
       # MinIO inside Docker is plain HTTP — do not flip this with the public HTTPS URL.
       Storage__UseSsl: "${Storage__UseSsl:-false}"
       Storage__Region: "${Storage__Region:-us-east-1}"
+      # Serilog → existing Seq container on chat-app-net
+      SEQ_URL: "${SEQ_URL:-http://seq}"
+      Seq__ServerUrl: "${Seq__ServerUrl:-${SEQ_URL:-http://seq}}"
+      Seq__UiUrl: "${SEQ_UI_URL:-http://localhost:5341}"
       # WebRTC — Coturn. Browsers load stun/turn from GET /api/v1/Call/ice-servers
       COTURN_ENABLED: "${COTURN_ENABLED:-true}"
       TURN_PUBLIC_HOST: "${TURN_PUBLIC_HOST:-}"

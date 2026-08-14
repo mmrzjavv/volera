@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Core.Application.Handlers;
 using Core.Application.Interfaces;
+using Core.Application.Logging;
 using Core.Domain.Entities;
 using Core.Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,7 +36,9 @@ public class OutboxProcessorHostedService : BackgroundService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Outbox processor loop failure");
+                AppLog.Error(_logger, AppLogEvents.OutboxProcessorFailed, ex,
+                    "Error: {ErrorType} | Result: Failure",
+                    ex.GetType().Name);
             }
 
             try
@@ -68,7 +71,9 @@ public class OutboxProcessorHostedService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Outbox item {OutboxId} failed (attempt {Attempt})", item.Id, item.AttemptCount + 1);
+                AppLog.Warning(_logger, AppLogEvents.OutboxItemFailed, ex,
+                    "OutboxId: {OutboxId} | Attempt: {Attempt} | Error: {ErrorType} | Result: Failure",
+                    item.Id, item.AttemptCount + 1, ex.GetType().Name);
                 var delay = TimeSpan.FromSeconds(Math.Min(300, Math.Pow(2, item.AttemptCount + 1)));
                 item.MarkRetry(ex.Message, delay, MaxAttempts);
                 await outbox.UpdateAsync(item, cancellationToken);

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Security.Claims;
+using Core.Application.Logging;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -29,18 +30,37 @@ public class GlobalExceptionMiddleware
         {
             var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)
                          ?? context.User.FindFirst("userId")?.Value;
+            var isClientError = ex is ValidationException
+                or UnauthorizedAccessException
+                or KeyNotFoundException
+                or InvalidOperationException
+                or Core.Application.Exceptions.MaxSessionsReachedException;
 
-            using (_logger.BeginScope(new Dictionary<string, object?>
+            if (isClientError)
             {
-                ["UserId"] = userId,
-                ["TraceIdentifier"] = context.TraceIdentifier
-            }))
-            {
-                _logger.LogError(ex,
-                    "An unhandled exception occurred while processing {RequestPath} {RequestMethod}. TraceIdentifier: {TraceIdentifier}",
-                    context.Request.Path,
+                AppLog.Warning(
+                    _logger,
+                    AppLogEvents.UnhandledException,
+                    ex,
+                    "Path: {RequestPath} | Method: {RequestMethod} | UserId: {UserId} | TraceId: {TraceId} | Error: {ErrorType} | Result: Failure",
+                    context.Request.Path.Value,
                     context.Request.Method,
-                    context.TraceIdentifier);
+                    userId,
+                    context.TraceIdentifier,
+                    ex.GetType().Name);
+            }
+            else
+            {
+                AppLog.Error(
+                    _logger,
+                    AppLogEvents.UnhandledException,
+                    ex,
+                    "Path: {RequestPath} | Method: {RequestMethod} | UserId: {UserId} | TraceId: {TraceId} | Error: {ErrorType} | Result: Failure",
+                    context.Request.Path.Value,
+                    context.Request.Method,
+                    userId,
+                    context.TraceIdentifier,
+                    ex.GetType().Name);
             }
 
             await HandleExceptionAsync(context, ex);

@@ -3,6 +3,7 @@ using MediatR;
 using Core.Application.Queries;
 using Core.Application.Commands;
 using WebAPI.DTOs;
+using Core.Application.Logging;
 using WebAPI.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
@@ -29,11 +30,8 @@ public class GroupController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to create group {GroupName}.", request.Name);
             return this.ApiUnauthorized();
         }
-
-        _logger.LogInformation("User {UserId} creating group {GroupName} with {MemberCount} member(s).", currentUserId, request.Name, request.MemberIds?.Count ?? 0);
         var command = new CreateGroupCommand
         {
             Name = request.Name,
@@ -42,7 +40,9 @@ public class GroupController : ControllerBase
         };
 
         var groupId = await _mediator.Send(command);
-        _logger.LogInformation("Group created. GroupId: {GroupId}, CreatorId: {UserId}, Name: {GroupName}.", groupId, currentUserId, request.Name);
+        AppLog.Info(_logger, AppLogEvents.GroupCreated,
+            "UserId: {UserId} | GroupId: {GroupId} | Name: {GroupName} | MemberCount: {MemberCount} | Result: Success",
+            currentUserId, groupId, request.Name, request.MemberIds?.Count ?? 0);
         return this.Success(new { groupId });
     }
 
@@ -52,11 +52,8 @@ public class GroupController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to get group details for GroupId {GroupId}.", groupId);
             return this.ApiUnauthorized();
         }
-
-        _logger.LogInformation("User {UserId} fetching details for group {GroupId}.", currentUserId, groupId);
         var query = new GetGroupDetailsQuery
         {
             GroupId = groupId,
@@ -66,17 +63,14 @@ public class GroupController : ControllerBase
         try
         {
             var details = await _mediator.Send(query);
-            _logger.LogInformation("User {UserId} retrieved details for group {GroupId}.", currentUserId, groupId);
             return this.Success(details);
         }
         catch (KeyNotFoundException)
         {
-            _logger.LogWarning("Group {GroupId} not found for User {UserId}.", groupId, currentUserId);
             return this.ApiNotFound("Group not found");
         }
         catch (UnauthorizedAccessException)
         {
-            _logger.LogWarning("User {UserId} is not a member of group {GroupId}.", currentUserId, groupId);
             return this.ApiForbid("You are not a member of this group");
         }
     }
@@ -87,11 +81,8 @@ public class GroupController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to get messages for group {GroupId}.", groupId);
             return this.ApiUnauthorized();
         }
-
-        _logger.LogInformation("User {UserId} fetching messages for group {GroupId}. Before: {Before}, Limit: {Limit}.", currentUserId, groupId, before, limit);
         var query = new GetGroupMessagesQuery
         {
             GroupId = groupId,
@@ -121,11 +112,8 @@ public class GroupController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to add member to group {GroupId}.", groupId);
             return this.ApiUnauthorized();
         }
-
-        _logger.LogInformation("User {UserId} adding member {MemberId} to group {GroupId}.", currentUserId, request.MemberId, groupId);
         var command = new AddMemberCommand
         {
             GroupId = groupId,
@@ -136,6 +124,9 @@ public class GroupController : ControllerBase
         try
         {
             await _mediator.Send(command);
+            AppLog.Info(_logger, AppLogEvents.GroupMemberAdded,
+                "UserId: {UserId} | GroupId: {GroupId} | MemberId: {MemberId} | Result: Success",
+                currentUserId, groupId, request.MemberId);
             return this.Success();
         }
         catch (KeyNotFoundException)
@@ -167,6 +158,9 @@ public class GroupController : ControllerBase
         try
         {
             await _mediator.Send(command);
+            AppLog.Info(_logger, AppLogEvents.GroupMemberRemoved,
+                "UserId: {UserId} | GroupId: {GroupId} | MemberId: {MemberId} | Result: Success",
+                currentUserId, groupId, memberId);
             return this.Success();
         }
         catch (KeyNotFoundException)

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
 using Core.Application.Commands;
+using Core.Application.Logging;
 using WebAPI.Extensions;
 
 namespace WebAPI.Controllers;
@@ -23,7 +24,7 @@ public class SupportAuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] SupportLoginRequest request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Support login attempt for username {Username}.", request.Username);
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
 
         if (request.CompanyId != null && request.CompanyId != Guid.Empty)
         {
@@ -35,8 +36,16 @@ public class SupportAuthController : ControllerBase
             };
             var result = await _mediator.Send(command, cancellationToken);
             if (result == null)
+            {
+                AppLog.Warning(_logger, AppLogEvents.SupportLoginFailed,
+                    "Username: {Username} | CompanyId: {CompanyId} | IP: {ClientIp} | Reason: InvalidCredentials | Result: Failure",
+                    request.Username, request.CompanyId, clientIp);
                 return this.ApiUnauthorized("Invalid username or password.");
-            _logger.LogInformation("Support login successful for username {Username}.", request.Username);
+            }
+
+            AppLog.Info(_logger, AppLogEvents.SupportLoginSucceeded,
+                "SupportUserId: {SupportUserId} | Username: {Username} | CompanyId: {CompanyId} | IP: {ClientIp} | Method: Password | Result: Success",
+                result.SupportUser?.Id, request.Username, request.CompanyId, clientIp);
             return this.Success(result);
         }
 
@@ -47,8 +56,16 @@ public class SupportAuthController : ControllerBase
         };
         var byUsernameResult = await _mediator.Send(byUsernameCommand, cancellationToken);
         if (byUsernameResult == null)
+        {
+            AppLog.Warning(_logger, AppLogEvents.SupportLoginFailed,
+                "Username: {Username} | IP: {ClientIp} | Reason: InvalidCredentials | Result: Failure",
+                request.Username, clientIp);
             return this.ApiUnauthorized("Invalid username or password.");
-        _logger.LogInformation("Support login successful for username {Username}.", request.Username);
+        }
+
+        AppLog.Info(_logger, AppLogEvents.SupportLoginSucceeded,
+            "SupportUserId: {SupportUserId} | Username: {Username} | CompanyId: {CompanyId} | IP: {ClientIp} | Method: Password | Result: Success",
+            byUsernameResult.SupportUser?.Id, request.Username, byUsernameResult.SupportUser?.CompanyId, clientIp);
         return this.Success(byUsernameResult);
     }
 
@@ -62,7 +79,16 @@ public class SupportAuthController : ControllerBase
         };
         var result = await _mediator.Send(command, cancellationToken);
         if (result == null)
+        {
+            AppLog.Warning(_logger, AppLogEvents.TokenRefreshFailed,
+                "IP: {ClientIp} | Reason: InvalidOrExpiredSupportToken | Result: Failure",
+                HttpContext.Connection.RemoteIpAddress?.ToString());
             return this.ApiUnauthorized("Invalid or expired token.");
+        }
+
+        AppLog.Info(_logger, AppLogEvents.TokenRefreshed,
+            "SupportUserId: {SupportUserId} | Result: Success",
+            result.SupportUser?.Id);
         return this.Success(result);
     }
 }

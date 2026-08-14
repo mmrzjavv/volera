@@ -16,12 +16,18 @@ public class ChatHub : Hub
     private readonly IMediator _mediator;
     private readonly IOnlineUserService _onlineUserService;
     private readonly IConnectionManager _connectionManager;
+    private readonly ILogger<ChatHub> _logger;
 
-    public ChatHub(IMediator mediator, IOnlineUserService onlineUserService, IConnectionManager connectionManager)
+    public ChatHub(
+        IMediator mediator,
+        IOnlineUserService onlineUserService,
+        IConnectionManager connectionManager,
+        ILogger<ChatHub> logger)
     {
         _mediator = mediator;
         _onlineUserService = onlineUserService;
         _connectionManager = connectionManager;
+        _logger = logger;
     }
 
     public override async Task OnConnectedAsync()
@@ -31,11 +37,9 @@ public class ChatHub : Hub
             var userIdClaim = Context.User?.FindFirst("userId")?.Value;
             if (userIdClaim != null && Guid.TryParse(userIdClaim, out var userId))
             {
-                // Register connection for notification
                 _connectionManager.RegisterConnection(Context.ConnectionId, userIdClaim);
                 await _onlineUserService.UserConnected(userId);
 
-                // Join user to their group channels
                 var groups = await _mediator.Send(new GetUserGroupsQuery { UserId = userId });
                 foreach (var group in groups)
                 {
@@ -45,13 +49,9 @@ public class ChatHub : Hub
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ChatHub] Error in OnConnectedAsync: {ex.Message}");
-            // We might want to rethrow or allow the connection but log the error
-            // If we rethrow, the client gets the AbortError
-            // If we swallow, the client connects but might not receive messages
-            // For now, let's swallow to see if it fixes the "negotiation" error, 
-            // but the user won't be in groups.
-            // Better to log and allow connection to proceed so we can at least debug via console logs if possible.
+            _logger.LogError(ex,
+                "ChatHubConnectFailed | ConnectionId: {ConnectionId} | Error: {ErrorType} | Result: Failure",
+                Context.ConnectionId, ex.GetType().Name);
         }
         await base.OnConnectedAsync();
     }

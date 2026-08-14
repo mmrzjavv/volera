@@ -1,4 +1,5 @@
 using Core.Application.Interfaces;
+using Core.Application.Logging;
 using Core.Domain.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -31,19 +32,12 @@ public class CallNotificationService : ICallNotificationService
 
     public async Task SendCallInitiated(string callId, Guid callerId, Guid receiverId, bool isVideo)
     {
-        // Send directly to the receiver, not to the group (receiver might not be in group yet)
         var receiverIdString = receiverId.ToString();
         var callerIdString = callerId.ToString();
 
-        // Fetch caller info to get the name
         var caller = await _userRepository.GetByIdAsync(callerId);
         var callerName = caller != null ? $"{caller.FirstName} {caller.LastName}" : "Unknown";
 
-        _logger.LogInformation(
-            "Sending CallInitiated. CallId: {CallId}, CallerId: {CallerId}, CallerName: {CallerName}, ReceiverId: {ReceiverId}, IsVideo: {IsVideo}",
-            callId, callerIdString, callerName, receiverIdString, isVideo);
-
-        // Create consistent data object using DTO class (avoids JSON serialization issues)
         var callData = new CallInitiatedMessage
         {
             CallId = callId,
@@ -53,43 +47,36 @@ public class CallNotificationService : ICallNotificationService
             IsVideo = isVideo
         };
 
-        // PRIMARY METHOD: Send to all connections for this user using IConnectionManager
         var connectionsForUser = _connectionManager.GetConnectionsForUser(receiverIdString);
+        var deliveredRealtime = false;
 
         if (connectionsForUser.Any())
         {
-            _logger.LogInformation(
-                "Found {ConnectionCount} connection(s) for user {ReceiverId}. ConnectionIds: {ConnectionIds}",
-                connectionsForUser.Count, receiverIdString, string.Join(", ", connectionsForUser));
             try
             {
                 await _hubContext.Clients.Clients(connectionsForUser).SendAsync("CallInitiated", callData);
-                _logger.LogInformation("Sent CallInitiated via connection IDs for user {ReceiverId}.", receiverIdString);
+                deliveredRealtime = true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending CallInitiated via connection IDs for user {ReceiverId}.", receiverIdString);
+                AppLog.Error(_logger, AppLogEvents.CallNotifyFailed, ex,
+                    "CallId: {CallId} | ReceiverId: {ReceiverId} | Channel: ConnectionIds | Error: {ErrorType} | Result: Failure",
+                    callId, receiverIdString, ex.GetType().Name);
             }
         }
-        else
-        {
-            _logger.LogWarning("No connections found for user {ReceiverId} when sending CallInitiated.", receiverIdString);
-        }
 
-        // FALLBACK: Clients.User (when IUserIdProvider maps userId claim)
         try
         {
             await _hubContext.Clients.User(receiverIdString).SendAsync("CallInitiated", callData);
-            _logger.LogInformation("Also sent CallInitiated via Clients.User for user {ReceiverId}.", receiverIdString);
+            deliveredRealtime = true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending CallInitiated via Clients.User for user {ReceiverId}.", receiverIdString);
+            AppLog.Error(_logger, AppLogEvents.CallNotifyFailed, ex,
+                "CallId: {CallId} | ReceiverId: {ReceiverId} | Channel: Clients.User | Error: {ErrorType} | Result: Failure",
+                callId, receiverIdString, ex.GetType().Name);
         }
 
-        // Do not broadcast to All — that leaks call metadata and floods every client.
-
-        // Always send push notification so the receiver gets ringing on all devices (e.g. phone when app is closed, even if they have web open)
         try
         {
             await _pushNotificationService.SendPushNotificationAsync(
@@ -104,18 +91,22 @@ public class CallNotificationService : ICallNotificationService
                     receiverId = receiverIdString,
                     type = "call_initiated",
                     isVideo
-                }
-            );
-            _logger.LogInformation("Push notification for CallInitiated sent to user {ReceiverId}. CallId: {CallId}", receiverIdString, callId);
+                });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending CallInitiated push notification to user {ReceiverId}. CallId: {CallId}", receiverIdString, callId);
+            AppLog.Error(_logger, AppLogEvents.PushFailed, ex,
+                "UserId: {UserId} | CallId: {CallId} | Error: {ErrorType} | Result: Failure",
+                receiverIdString, callId, ex.GetType().Name);
         }
 
-        _logger.LogInformation("Finished SendCallInitiated. CallId: {CallId}, CallerId: {CallerId}, ReceiverId: {ReceiverId}", callId, callerIdString, receiverIdString);
+        if (!deliveredRealtime)
+        {
+            AppLog.Warning(_logger, AppLogEvents.CallNotifyFailed,
+                "CallId: {CallId} | CallerId: {CallerId} | ReceiverId: {ReceiverId} | Reason: NoActiveConnections | PushAttempted: true | Result: Partial",
+                callId, callerIdString, receiverIdString);
+        }
     }
-
 
     public async Task SendCallAccepted(string callId, Guid callerId, Guid receiverId)
     {
@@ -126,8 +117,6 @@ public class CallNotificationService : ICallNotificationService
             ReceiverId = receiverId.ToString()
         };
 
-        // Caller must receive this even if JoinCallGroup raced or failed — otherwise no WebRTC offer is sent
-        // and the callee stays on the Incoming UI (and a second Accept hits "only if ringing").
         var callerIdString = callerId.ToString();
         var callerConnections = _connectionManager.GetConnectionsForUser(callerIdString);
         if (callerConnections.Any())
@@ -138,7 +127,9 @@ public class CallNotificationService : ICallNotificationService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending CallAccepted via connection IDs for caller {CallerId}.", callerIdString);
+                AppLog.Error(_logger, AppLogEvents.CallNotifyFailed, ex,
+                    "CallId: {CallId} | CallerId: {CallerId} | Event: CallAccepted | Error: {ErrorType} | Result: Failure",
+                    callId, callerIdString, ex.GetType().Name);
             }
         }
 
@@ -148,7 +139,9 @@ public class CallNotificationService : ICallNotificationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending CallAccepted via Clients.User for caller {CallerId}.", callerIdString);
+            AppLog.Error(_logger, AppLogEvents.CallNotifyFailed, ex,
+                "CallId: {CallId} | CallerId: {CallerId} | Event: CallAccepted | Channel: Clients.User | Error: {ErrorType} | Result: Failure",
+                callId, callerIdString, ex.GetType().Name);
         }
 
         await _hubContext.Clients.Group(callId).SendAsync("CallAccepted", message);
@@ -173,7 +166,9 @@ public class CallNotificationService : ICallNotificationService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending CallRejected via connection IDs for caller {CallerId}.", callerIdString);
+                AppLog.Error(_logger, AppLogEvents.CallNotifyFailed, ex,
+                    "CallId: {CallId} | CallerId: {CallerId} | Event: CallRejected | Error: {ErrorType} | Result: Failure",
+                    callId, callerIdString, ex.GetType().Name);
             }
         }
 
@@ -183,7 +178,9 @@ public class CallNotificationService : ICallNotificationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending CallRejected via Clients.User for caller {CallerId}.", callerIdString);
+            AppLog.Error(_logger, AppLogEvents.CallNotifyFailed, ex,
+                "CallId: {CallId} | CallerId: {CallerId} | Event: CallRejected | Channel: Clients.User | Error: {ErrorType} | Result: Failure",
+                callId, callerIdString, ex.GetType().Name);
         }
 
         await _hubContext.Clients.Group(callId).SendAsync("CallRejected", message);

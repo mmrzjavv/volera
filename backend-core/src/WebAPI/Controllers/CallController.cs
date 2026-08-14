@@ -6,6 +6,7 @@ using Core.Application.Commands;
 using Core.Application.Queries;
 using Core.Application.DTOs;
 using WebAPI.DTOs;
+using Core.Application.Logging;
 using WebAPI.Extensions;
 using WebAPI.Options;
 
@@ -98,10 +99,8 @@ public class CallController : ControllerBase
         var callerId = this.GetCurrentUserId();
         if (callerId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to initiate call to ReceiverId {ReceiverId}.", dto.ReceiverId);
             return this.ApiUnauthorized();
         }
-        _logger.LogInformation("User {CallerId} initiating call to ReceiverId {ReceiverId}, IsVideo: {IsVideo}.", callerId, dto.ReceiverId, dto.IsVideo);
         var command = new InitiateCallCommand
         {
             CallerId = callerId.Value,
@@ -110,7 +109,9 @@ public class CallController : ControllerBase
         };
 
         var callId = await _mediator.Send(command);
-        _logger.LogInformation("Call initiated. CallId: {CallId}, CallerId: {CallerId}, ReceiverId: {ReceiverId}.", callId, callerId, dto.ReceiverId);
+        AppLog.Info(_logger, AppLogEvents.CallInitiated,
+            "UserId: {UserId} | CallId: {CallId} | ReceiverId: {ReceiverId} | IsVideo: {IsVideo} | Result: Success",
+            callerId, callId, dto.ReceiverId, dto.IsVideo);
         return this.Success(new { callId });
     }
 
@@ -120,10 +121,8 @@ public class CallController : ControllerBase
         var userId = this.GetCurrentUserId();
         if (userId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to accept call {CallId}.", callId);
             return this.ApiUnauthorized();
         }
-        _logger.LogInformation("User {UserId} accepting call {CallId}.", userId, callId);
         var command = new AcceptCallCommand
         {
             CallId = callId,
@@ -131,7 +130,9 @@ public class CallController : ControllerBase
         };
 
         await _mediator.Send(command);
-        _logger.LogInformation("Call {CallId} accepted by User {UserId}.", callId, userId);
+        AppLog.Info(_logger, AppLogEvents.CallAccepted,
+            "UserId: {UserId} | CallId: {CallId} | Result: Success",
+            userId, callId);
         return this.Success();
     }
 
@@ -141,10 +142,8 @@ public class CallController : ControllerBase
         var userId = this.GetCurrentUserId();
         if (userId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to reject call {CallId}.", callId);
             return this.ApiUnauthorized();
         }
-        _logger.LogInformation("User {UserId} rejecting call {CallId}.", userId, callId);
         var command = new RejectCallCommand
         {
             CallId = callId,
@@ -152,7 +151,9 @@ public class CallController : ControllerBase
         };
 
         await _mediator.Send(command);
-        _logger.LogInformation("Call {CallId} rejected by User {UserId}.", callId, userId);
+        AppLog.Info(_logger, AppLogEvents.CallRejected,
+            "UserId: {UserId} | CallId: {CallId} | Result: Success",
+            userId, callId);
         return this.Success();
     }
 
@@ -162,10 +163,8 @@ public class CallController : ControllerBase
         var userId = this.GetCurrentUserId();
         if (userId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to end call {CallId}.", callId);
             return this.ApiUnauthorized();
         }
-        _logger.LogInformation("User {UserId} ending call {CallId}.", userId, callId);
         var command = new EndCallCommand
         {
             CallId = callId,
@@ -173,7 +172,9 @@ public class CallController : ControllerBase
         };
 
         await _mediator.Send(command);
-        _logger.LogInformation("Call {CallId} ended by User {UserId}.", callId, userId);
+        AppLog.Info(_logger, AppLogEvents.CallEnded,
+            "UserId: {UserId} | CallId: {CallId} | Result: Success",
+            userId, callId);
         return this.Success();
     }
 
@@ -190,10 +191,8 @@ public class CallController : ControllerBase
         var userId = this.GetCurrentUserId();
         if (userId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to get call history.");
             return this.ApiUnauthorized();
         }
-        _logger.LogInformation("User {UserId} fetching call history. Page: {Page}, PageSize: {PageSize}.", userId, page, pageSize);
         var query = new GetCallsByUserIdQuery
         {
             UserId = userId.Value,
@@ -206,7 +205,6 @@ public class CallController : ControllerBase
             SortDescending = sortDescending
         };
         var result = await _mediator.Send(query);
-        _logger.LogInformation("User {UserId} retrieved call history successfully.", userId);
         return this.Success(result);
     }
 }

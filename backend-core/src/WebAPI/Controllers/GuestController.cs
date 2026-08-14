@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MediatR;
 using Core.Application.Commands;
+using Core.Application.Logging;
 using WebAPI.Extensions;
 using WebAPI.Models;
 
@@ -32,7 +33,6 @@ public class GuestController : ControllerBase
     [EnableRateLimiting("GuestCreateSession")]
     public async Task<IActionResult> CreateSession([FromBody] CreateGuestSessionRequest request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Guest session creation requested.");
         var command = new CreateGuestSessionCommand
         {
             FirstName = request.FirstName,
@@ -41,7 +41,9 @@ public class GuestController : ControllerBase
             Mobile = request.Mobile
         };
         var result = await _mediator.Send(command, cancellationToken);
-        _logger.LogInformation("Guest session created. GuestId: {GuestId}", result.GuestId);
+        AppLog.Info(_logger, AppLogEvents.GuestSessionCreated,
+            "GuestId: {GuestId} | IP: {ClientIp} | Result: Success",
+            result.GuestId, HttpContext.Connection.RemoteIpAddress?.ToString());
         return new ObjectResult(ApiResponse<object>.Ok(new
         {
             guestToken = result.GuestToken,
@@ -66,6 +68,9 @@ public class GuestController : ControllerBase
             AttachmentType = request.AttachmentType
         };
         var messageId = await _mediator.Send(command, cancellationToken);
+        AppLog.Info(_logger, AppLogEvents.MessageSent,
+            "MessageId: {MessageId} | Channel: Guest | HasAttachment: {HasAttachment} | Result: Success",
+            messageId, !string.IsNullOrEmpty(request.AttachmentUrl));
         return this.Success(new { messageId });
     }
 }

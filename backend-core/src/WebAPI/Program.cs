@@ -3,9 +3,11 @@ using Hangfire;
 using WebAPI.Authorization;
 using WebAPI.Configurations;
 using WebAPI.Hubs;
+using WebAPI.Logging;
 using WebAPI.Middlewares;
 using Infrastructure.Persistence;
 using Core.Application.Interfaces;
+using Core.Application.Logging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -19,26 +21,8 @@ try
 {
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseSerilog((context, services, configuration) =>
-{
-    configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .Enrich.WithEnvironmentName()
-        .Enrich.WithMachineName()
-        .Enrich.WithThreadId()
-        .WriteTo.Console();
-
-    var seqUrl = context.Configuration["SEQ_URL"]
-        ?? context.Configuration["Seq:ServerUrl"]
-        ?? context.Configuration["Serilog:WriteTo:0:Args:ServerUrl"];
-
-    if (!string.IsNullOrWhiteSpace(seqUrl))
-    {
-        configuration.WriteTo.Seq(seqUrl);
-    }
-});
+builder.Host.UseSerilog(SerilogConfiguration.Configure);
+builder.Logging.ClearProviders();
 
 // Host-only local Docker DB wiring. Do NOT load inside containers — env vars from compose win.
 if (builder.Environment.IsDevelopment()
@@ -130,7 +114,9 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
+        AppLog.Error(logger, AppLogEvents.DatabaseInitFailed, ex,
+            "Error: {ErrorType}",
+            ex.GetType().Name);
     }
 }
 
@@ -140,9 +126,32 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-
-
 app.UseGlobalExceptionMiddleware();
+
+app.UseSerilogRequestLogging(options =>
+{
+    options.GetLevel = (httpContext, elapsed, ex) =>
+    {
+        if (ex != null)
+            return Serilog.Events.LogEventLevel.Error;
+        if (httpContext.Response.StatusCode >= 500)
+            return Serilog.Events.LogEventLevel.Error;
+        if (httpContext.Response.StatusCode >= 400)
+            return Serilog.Events.LogEventLevel.Warning;
+        if (SerilogConfiguration.IsHealthOrNoisePath(httpContext.Request.Path.Value))
+            return Serilog.Events.LogEventLevel.Debug;
+        // Successful API traffic: Debug so production Information floor stays business-event focused
+        return Serilog.Events.LogEventLevel.Debug;
+    };
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString());
+        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+        diagnosticContext.Set("StatusCode", httpContext.Response.StatusCode);
+        if (httpContext.Request.Headers.TryGetValue(RequestLogContextMiddleware.CorrelationHeaderName, out var cid))
+            diagnosticContext.Set("CorrelationId", cid.ToString());
+    };
+});
 
 app.UseCors("AllowFrontend");
 app.UseStaticFiles();
@@ -150,6 +159,8 @@ app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+// After auth so UserId/Username/SessionId enrich Serilog LogContext for the rest of the pipeline
+app.UseMiddleware<RequestLogContextMiddleware>();
 app.UseAppVersionCheckMiddleware();
 
 app.UseHangfireDashboard("/hangfire", new DashboardOptions

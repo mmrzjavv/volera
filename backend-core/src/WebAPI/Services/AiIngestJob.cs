@@ -1,4 +1,5 @@
 using Core.Application.Interfaces;
+using Core.Application.Logging;
 using Core.Domain.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using WebAPI.Hubs;
@@ -65,7 +66,9 @@ public class AiIngestJob
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Ingest failed for job {JobId}", jobId);
+            AppLog.Warning(_logger, AppLogEvents.AiIngestFailed, ex,
+                "JobId: {JobId} | TenantId: {TenantId} | CompanyId: {CompanyId} | Error: {ErrorType} | Result: Failure",
+                jobId, tenantId, companyId, ex.GetType().Name);
             if (block != null)
             {
                 block.SetFailed(ex.Message);

@@ -1,5 +1,4 @@
 using MediatR;
-using Microsoft.Extensions.Logging;
 using Core.Application.DTOs;
 using Core.Domain.Interfaces;
 using Core.Application.Interfaces;
@@ -15,7 +14,6 @@ public class GetRecentChatsQueryHandler : IRequestHandler<GetRecentChatsQuery, I
     private readonly ISavedMessageRepository _savedMessageRepository;
     private readonly IHiddenChatRepository _hiddenChatRepository;
     private readonly IFileStorageService _fileStorage;
-    private readonly ILogger<GetRecentChatsQueryHandler> _logger;
 
     public GetRecentChatsQueryHandler(
         IMessageRepository messageRepository,
@@ -24,8 +22,7 @@ public class GetRecentChatsQueryHandler : IRequestHandler<GetRecentChatsQuery, I
         IOnlineUserService onlineUserService,
         ISavedMessageRepository savedMessageRepository,
         IHiddenChatRepository hiddenChatRepository,
-        IFileStorageService fileStorage,
-        ILogger<GetRecentChatsQueryHandler> logger)
+        IFileStorageService fileStorage)
     {
         _messageRepository = messageRepository;
         _userRepository = userRepository;
@@ -34,14 +31,11 @@ public class GetRecentChatsQueryHandler : IRequestHandler<GetRecentChatsQuery, I
         _savedMessageRepository = savedMessageRepository;
         _hiddenChatRepository = hiddenChatRepository;
         _fileStorage = fileStorage;
-        _logger = logger;
     }
 
     public async Task<IEnumerable<RecentChatDto>> Handle(GetRecentChatsQuery request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Fetching recent chats for User {UserId}.", request.UserId);
         var rawChats = (await _messageRepository.GetRecentChatsAsync(request.UserId)).ToList();
-        _logger.LogInformation("User {UserId}: found {RawChatCount} raw recent chat(s).", request.UserId, rawChats.Count);
 
         var result = new List<RecentChatDto>();
 

@@ -32,9 +32,6 @@ public class ConnectionManager : IConnectionManager
                 existing.TryAdd(connectionId, 0);
                 return existing;
             });
-
-        Console.WriteLine($"[ConnectionManager] Registered: {connectionId} -> {userId}");
-        Console.WriteLine($"[ConnectionManager] Total connections: {_connectionToUserId.Count}, Users: {_userIdToConnections.Count}");
     }
 
     public void UnregisterConnection(string connectionId)
@@ -49,8 +46,6 @@ public class ConnectionManager : IConnectionManager
                     _userIdToConnections.TryRemove(userId, out _);
                 }
             }
-
-            Console.WriteLine($"[ConnectionManager] Unregistered: {connectionId} -> {userId}");
         }
     }
 

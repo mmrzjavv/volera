@@ -60,21 +60,15 @@ public class EncryptionMiddleware
             try
             {
                 sessionKey = sessionKeyManager.GetSessionKey(userId);
-                if (sessionKey != null)
-                {
-                    _logger.LogInformation("[BACKEND] Retrieved session key for user {UserId}. Key (hex): {KeyHex}", 
-                        userId, Convert.ToHexString(sessionKey));
-                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error getting session key for user {UserId}", userId);
+                _logger.LogDebug(ex, "SessionKeyLookupFailed | UserId: {UserId}", userId);
             }
 
             if (sessionKey == null)
             {
                 // No session key, skip encryption (will be established via key exchange)
-                _logger.LogInformation("[BACKEND] No session key found for user {UserId}, skipping encryption", userId);
                 await _next(context);
                 return;
             }
@@ -109,13 +103,10 @@ public class EncryptionMiddleware
                     context.Request.Body = decryptedStream;
                     context.Request.ContentLength = decryptedBytes.Length;
                     context.Request.ContentType = "application/json";
-                    
-                    _logger.LogDebug("Successfully decrypted request body for user {UserId}. Original: {OriginalLength} bytes, Decrypted: {DecryptedLength} bytes", 
-                        userId, encryptedBody.Length, decryptedBody.Length);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to decrypt request body for user {UserId}. Assuming unencrypted. Error: {Error}", userId, ex.Message);
+                    _logger.LogDebug(ex, "RequestDecryptSkipped | UserId: {UserId}", userId);
                     // If decryption fails, assume it's not encrypted (backward compatibility)
                     // Reset the stream to the beginning with original content
                     context.Request.Body.Position = 0;
@@ -146,7 +137,7 @@ public class EncryptionMiddleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in request pipeline");
+                _logger.LogError(ex, "EncryptionPipelineError | Result: Failure");
                 // Restore original response body and rethrow
                 context.Response.Body = originalResponseBody;
                 throw;
@@ -165,8 +156,6 @@ public class EncryptionMiddleware
                 {
                     try
                     {
-                        _logger.LogInformation("[BACKEND] Encrypting response for user {UserId}. Response length: {Length}, Session key (hex): {KeyHex}", 
-                            userId, responseText.Length, Convert.ToHexString(sessionKey));
                         var encryptedResponse = encryptionService.Encrypt(responseText, sessionKey);
                         var encryptedBytes = Encoding.UTF8.GetBytes(encryptedResponse);
                         
@@ -178,13 +167,11 @@ public class EncryptionMiddleware
                         context.Response.Body.Seek(0, SeekOrigin.Begin);
                         await context.Response.Body.CopyToAsync(originalResponseBody);
                         context.Response.Body = originalResponseBody;
-                        _logger.LogInformation("[BACKEND] Response encrypted successfully for user {UserId}. Encrypted length: {Length}", 
-                            userId, encryptedResponse.Length);
                         return;
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to encrypt response body for user {UserId}. Error: {Error}", userId, ex.Message);
+                        _logger.LogError(ex, "ResponseEncryptFailed | UserId: {UserId} | Error: {ErrorType} | Result: Failure", userId, ex.GetType().Name);
                         // Fallback to original response (unencrypted)
                         responseBody.Seek(0, SeekOrigin.Begin);
                         await responseBody.CopyToAsync(originalResponseBody);
@@ -203,7 +190,7 @@ public class EncryptionMiddleware
         catch (Exception ex)
         {
             // If anything goes wrong in the middleware, log and continue without encryption
-            _logger.LogError(ex, "Unexpected error in encryption middleware for path {Path}", context.Request.Path);
+            _logger.LogError(ex, "EncryptionMiddlewareFailed | Path: {Path} | Error: {ErrorType} | Result: Failure", context.Request.Path, ex.GetType().Name);
             await _next(context);
         }
     }

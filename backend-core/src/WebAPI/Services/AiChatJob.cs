@@ -1,4 +1,5 @@
 using Core.Application.Interfaces;
+using Core.Application.Logging;
 using Microsoft.AspNetCore.SignalR;
 using WebAPI.Hubs;
 
@@ -30,7 +31,9 @@ public class AiChatJob
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Chat failed for correlation {CorrelationId}", correlationId);
+            AppLog.Warning(_logger, AppLogEvents.AiJobFailed, ex,
+                "CorrelationId: {CorrelationId} | TenantId: {TenantId} | Error: {ErrorType} | Result: Failure",
+                correlationId, tenantId, ex.GetType().Name);
             await _hubContext.Clients.Client(connectionId)
                 .SendAsync("AiReply", correlationId, $"Sorry, an error occurred: {ex.Message}");
         }

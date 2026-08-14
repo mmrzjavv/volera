@@ -3,6 +3,7 @@ using MediatR;
 using Core.Application.Queries;
 using Core.Application.Commands;
 using WebAPI.DTOs;
+using Core.Application.Logging;
 using WebAPI.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
@@ -49,6 +50,9 @@ public class MessageController : ControllerBase
         };
 
         var messageId = await _mediator.Send(command);
+        AppLog.Info(_logger, AppLogEvents.MessageSent,
+            "UserId: {UserId} | MessageId: {MessageId} | ReceiverId: {ReceiverId} | GroupId: {GroupId} | HasAttachment: {HasAttachment} | Result: Success",
+            currentUserId, messageId, request.ReceiverId, request.GroupId, !string.IsNullOrEmpty(request.AttachmentUrl));
         return this.Success(new { id = messageId, clientMessageId = request.ClientMessageId });
     }
 
@@ -82,7 +86,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to fetch recent chats. No valid user id in claims.");
             return this.ApiUnauthorized();
         }
 
@@ -90,10 +93,7 @@ public class MessageController : ControllerBase
         {
             UserId = currentUserId.Value
         };
-
-        _logger.LogInformation("User {UserId} is fetching recent chats.", currentUserId);
         var chats = await _mediator.Send(query);
-        _logger.LogInformation("User {UserId} fetched recent chats successfully.", currentUserId);
         return this.Success(chats);
     }
 
@@ -103,7 +103,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to get total message count. No valid user id in claims.");
             return this.ApiUnauthorized();
         }
 
@@ -122,7 +121,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to mark messages as read from sender {SenderId}.", senderId);
             return this.ApiUnauthorized();
         }
 
@@ -131,9 +129,10 @@ public class MessageController : ControllerBase
             UserId = currentUserId.Value,
             SenderId = senderId
         };
-
-        _logger.LogInformation("User {UserId} is marking messages as read from sender {SenderId}.", currentUserId, senderId);
         await _mediator.Send(command);
+        AppLog.Info(_logger, AppLogEvents.MessagesMarkedRead,
+            "UserId: {UserId} | SenderId: {SenderId} | Result: Success",
+            currentUserId, senderId);
         return this.Success();
     }
 
@@ -143,7 +142,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to get unread counts. No valid user id in claims.");
             return this.ApiUnauthorized();
         }
 
@@ -162,12 +160,10 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to get saved messages for page {Page}, pageSize {PageSize}.", page, pageSize);
             return this.ApiUnauthorized();
         }
 
         var query = new GetSavedMessagesQuery(currentUserId.Value, page, pageSize);
-        _logger.LogInformation("User {UserId} is fetching saved messages. Page: {Page}, PageSize: {PageSize}.", currentUserId, page, pageSize);
         var result = await _mediator.Send(query);
         return this.Success(result);
     }
@@ -178,12 +174,10 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to save message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
         var command = new SaveMessageCommand(currentUserId.Value, messageId);
-        _logger.LogInformation("User {UserId} is saving message {MessageId}.", currentUserId, messageId);
         await _mediator.Send(command);
         return this.Success();
     }
@@ -194,12 +188,10 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to unsave message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
         var command = new UnsaveMessageCommand(currentUserId.Value, messageId);
-        _logger.LogInformation("User {UserId} is unsaving message {MessageId}.", currentUserId, messageId);
         await _mediator.Send(command);
         return this.Success();
     }
@@ -210,7 +202,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to get conversation with user {OtherUserId}.", userId);
             return this.ApiUnauthorized();
         }
 
@@ -221,8 +212,6 @@ public class MessageController : ControllerBase
             Before = before,
             Limit = limit
         };
-
-        _logger.LogInformation("User {UserId} is fetching conversation with {OtherUserId}. Before: {Before}, Limit: {Limit}.", currentUserId, userId, before, limit);
         var messages = await _mediator.Send(query);
         return this.Success(messages);
     }
@@ -233,7 +222,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to edit message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
@@ -246,20 +234,23 @@ public class MessageController : ControllerBase
 
         try
         {
-            _logger.LogInformation("User {UserId} is editing message {MessageId}.", currentUserId, messageId);
             var result = await _mediator.Send(command);
             if (!result)
                 return this.ApiNotFound("Message not found");
+            AppLog.Info(_logger, AppLogEvents.MessageEdited,
+                "UserId: {UserId} | MessageId: {MessageId} | Result: Success",
+                currentUserId, messageId);
             return this.Success();
         }
         catch (UnauthorizedAccessException)
         {
-            _logger.LogWarning("User {UserId} attempted to edit message {MessageId} but was forbidden.", currentUserId, messageId);
+            AppLog.Warning(_logger, AppLogEvents.AuthorizationDenied,
+                "UserId: {UserId} | Action: EditMessage | MessageId: {MessageId} | Result: Failure",
+                currentUserId, messageId);
             return this.ApiForbid("You are not allowed to edit this message");
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Invalid operation while editing message {MessageId} for user {UserId}.", messageId, currentUserId);
             return this.Fail(ex.Message);
         }
     }
@@ -270,7 +261,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to delete message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
@@ -282,15 +272,19 @@ public class MessageController : ControllerBase
 
         try
         {
-            _logger.LogInformation("User {UserId} is deleting message {MessageId}.", currentUserId, messageId);
             var result = await _mediator.Send(command);
             if (!result)
                 return this.ApiNotFound("Message not found");
+            AppLog.Info(_logger, AppLogEvents.MessageDeleted,
+                "UserId: {UserId} | MessageId: {MessageId} | Result: Success",
+                currentUserId, messageId);
             return this.Success();
         }
         catch (UnauthorizedAccessException)
         {
-            _logger.LogWarning("User {UserId} attempted to delete message {MessageId} but was forbidden.", currentUserId, messageId);
+            AppLog.Warning(_logger, AppLogEvents.AuthorizationDenied,
+                "UserId: {UserId} | Action: DeleteMessage | MessageId: {MessageId} | Result: Failure",
+                currentUserId, messageId);
             return this.ApiForbid("You are not allowed to delete this message");
         }
     }
@@ -301,7 +295,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to add/update reaction for message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
@@ -311,8 +304,6 @@ public class MessageController : ControllerBase
             UserId = currentUserId.Value,
             Emoji = request.Emoji
         };
-
-        _logger.LogInformation("User {UserId} is adding/updating reaction on message {MessageId} with emoji {Emoji}.", currentUserId, messageId, request.Emoji);
         await _mediator.Send(command);
         return this.Success();
     }
@@ -323,7 +314,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to remove reaction for message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
@@ -332,8 +322,6 @@ public class MessageController : ControllerBase
             MessageId = messageId,
             UserId = currentUserId.Value
         };
-
-        _logger.LogInformation("User {UserId} is removing reaction from message {MessageId}.", currentUserId, messageId);
         await _mediator.Send(command);
         return this.Success();
     }
@@ -350,7 +338,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to forward message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
@@ -361,13 +348,10 @@ public class MessageController : ControllerBase
             ReceiverId = request.ReceiverId,
             GroupId = request.GroupId
         };
-
-        _logger.LogInformation("User {UserId} is forwarding message {MessageId} to Receiver {ReceiverId} / Group {GroupId}.",
-            currentUserId,
-            messageId,
-            request.ReceiverId,
-            request.GroupId);
         var newMessageId = await _mediator.Send(command);
+        AppLog.Info(_logger, AppLogEvents.MessageForwarded,
+            "UserId: {UserId} | SourceMessageId: {MessageId} | NewMessageId: {NewMessageId} | ReceiverId: {ReceiverId} | GroupId: {GroupId} | Result: Success",
+            currentUserId, messageId, newMessageId, request.ReceiverId, request.GroupId);
         return this.Success(new { messageId = newMessageId });
     }
 
@@ -377,7 +361,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to pin message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
@@ -386,8 +369,6 @@ public class MessageController : ControllerBase
             MessageId = messageId,
             UserId = currentUserId.Value
         };
-
-        _logger.LogInformation("User {UserId} is pinning message {MessageId}.", currentUserId, messageId);
         await _mediator.Send(command);
         return this.Success();
     }
@@ -402,7 +383,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to remove chat.");
             return this.ApiUnauthorized();
         }
 
@@ -420,8 +400,10 @@ public class MessageController : ControllerBase
 
         try
         {
-            _logger.LogInformation("User {UserId} is removing chat (userId={OtherUserId}, groupId={GroupId}).", currentUserId, userId, groupId);
             await _mediator.Send(command);
+            AppLog.Info(_logger, AppLogEvents.ChatRemoved,
+                "UserId: {UserId} | OtherUserId: {OtherUserId} | GroupId: {GroupId} | Result: Success",
+                currentUserId, userId, groupId);
             return this.Success();
         }
         catch (KeyNotFoundException)
@@ -436,7 +418,6 @@ public class MessageController : ControllerBase
         var currentUserId = this.GetCurrentUserId();
         if (currentUserId is null)
         {
-            _logger.LogWarning("Unauthorized attempt to unpin message {MessageId}.", messageId);
             return this.ApiUnauthorized();
         }
 
@@ -445,8 +426,6 @@ public class MessageController : ControllerBase
             MessageId = messageId,
             UserId = currentUserId.Value
         };
-
-        _logger.LogInformation("User {UserId} is unpinning message {MessageId}.", currentUserId, messageId);
         await _mediator.Send(command);
         return this.Success();
     }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using MediatR;
 using Core.Application.Commands;
 using Core.Application.DTOs;
+using Core.Application.Logging;
 using WebAPI.Extensions;
 using WebAPI.Services;
 
@@ -27,7 +28,7 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("AuthLogin")]
     public async Task<IActionResult> Register([FromBody] RegisterUserDto dto)
     {
-        _logger.LogInformation("Register request for username {Username}, phone {PhoneNumber}.", dto.Username, dto.PhoneNumber);
+        var ctx = _requestContext.GetRequestContext();
         var command = new RegisterUserCommand
         {
             FirstName = dto.FirstName,
@@ -37,16 +38,27 @@ public class AuthController : ControllerBase
             Password = dto.Password
         };
 
-        var userId = await _mediator.Send(command);
-        _logger.LogInformation("User registered successfully. UserId: {UserId}, Username: {Username}.", userId, dto.Username);
-        return this.Success(new { userId });
+        try
+        {
+            var userId = await _mediator.Send(command);
+            AppLog.Info(_logger, AppLogEvents.UserRegistered,
+                "UserId: {UserId} | Username: {Username} | IP: {ClientIp} | Device: {DeviceType} | Result: Success",
+                userId, dto.Username, ctx.Location, ctx.DeviceType);
+            return this.Success(new { userId });
+        }
+        catch (InvalidOperationException ex)
+        {
+            AppLog.Warning(_logger, AppLogEvents.UserRegistered,
+                "Username: {Username} | IP: {ClientIp} | Reason: {Reason} | Result: Failure",
+                dto.Username, ctx.Location, ex.Message);
+            return this.Fail(ex.Message);
+        }
     }
 
     [HttpPost("login")]
     [EnableRateLimiting("AuthLogin")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        _logger.LogInformation("Login attempt for username {Username}.", dto.Username);
         var ctx = _requestContext.GetRequestContext();
         var command = new LoginCommand
         {
@@ -59,15 +71,33 @@ public class AuthController : ControllerBase
             AppVersion = ctx.AppVersion ?? dto.AppVersion
         };
 
-        var result = await _mediator.Send(command);
-        _logger.LogInformation("Login successful for username {Username}.", dto.Username);
-        return this.Success(result);
+        try
+        {
+            var result = await _mediator.Send(command);
+            AppLog.Info(_logger, AppLogEvents.UserLoginSucceeded,
+                "UserId: {UserId} | Username: {Username} | IP: {ClientIp} | Device: {DeviceType} | OS: {OS} | Browser: {Browser} | Method: Password | Result: Success",
+                result.User?.Id, dto.Username, ctx.Location, ctx.DeviceType, ctx.OS, ctx.Browser);
+            return this.Success(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            AppLog.Warning(_logger, AppLogEvents.UserLoginFailed,
+                "Username: {Username} | IP: {ClientIp} | Device: {DeviceType} | Reason: {Reason} | Result: Failure",
+                dto.Username, ctx.Location, ctx.DeviceType, ClassifyLoginFailure(ex.Message));
+            return this.ApiUnauthorized(ex.Message);
+        }
+        catch (Core.Application.Exceptions.MaxSessionsReachedException ex)
+        {
+            AppLog.Warning(_logger, AppLogEvents.UserLoginFailed,
+                "Username: {Username} | IP: {ClientIp} | Reason: MaxSessionsReached | Result: Failure",
+                dto.Username, ctx.Location);
+            return StatusCode(StatusCodes.Status409Conflict, WebAPI.Models.ApiResponse<object?>.Fail(ex.Message));
+        }
     }
 
     [HttpPost("refresh-token")]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDto dto)
     {
-        _logger.LogInformation("Refresh token request (no user id in context).");
         var ctx = _requestContext.GetRequestContext();
         var command = new RefreshTokenCommand
         {
@@ -76,8 +106,29 @@ public class AuthController : ControllerBase
             AppVersion = ctx.AppVersion ?? dto.AppVersion
         };
 
-        var result = await _mediator.Send(command);
-        _logger.LogInformation("Refresh token completed successfully.");
-        return this.Success(result);
+        try
+        {
+            var result = await _mediator.Send(command);
+            AppLog.Info(_logger, AppLogEvents.TokenRefreshed,
+                "UserId: {UserId} | IP: {ClientIp} | Result: Success",
+                result.User?.Id, ctx.Location);
+            return this.Success(result);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            AppLog.Warning(_logger, AppLogEvents.TokenRefreshFailed,
+                "IP: {ClientIp} | Reason: InvalidOrExpiredToken | Result: Failure",
+                ctx.Location);
+            return this.ApiUnauthorized("Invalid or expired token.");
+        }
     }
+
+    private static string ClassifyLoginFailure(string message) =>
+        message switch
+        {
+            var m when m.Contains("disabled", StringComparison.OrdinalIgnoreCase)
+                       || m.Contains("suspended", StringComparison.OrdinalIgnoreCase) => "AccountDisabled",
+            var m when m.Contains("Guest", StringComparison.OrdinalIgnoreCase) => "GuestNotAllowed",
+            _ => "InvalidCredentials"
+        };
 }

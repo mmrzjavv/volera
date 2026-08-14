@@ -36,10 +36,6 @@ public class InMemorySessionKeyManager : ISessionKeyManager
                 ExpiresAt = DateTime.UtcNow.Add(expiration)
             });
 
-        // Log the stored key for debugging
-        System.Console.WriteLine($"[BACKEND] Stored session key for user {userId}. Key (hex): {Convert.ToHexString(sessionKey)}");
-
-        // Cleanup expired keys periodically
         CleanupExpiredKeys();
     }
 
